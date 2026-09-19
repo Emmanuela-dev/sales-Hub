@@ -1,0 +1,26 @@
+[theme]
+primaryColor = "#3b82f6"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f8fafc"
+textColor = "#1e293b"
+font = "sans serif"
+
+[server]
+port = 8501
+headless = false
+runOnSave = true
+maxUploadSize = 200
+
+[client]
+toolbarMode = "minimal"
+showErrorDetails = false
+
+[logger]
+level = "info"
+
+[deprecation]
+showFileUploaderEncoding = false
+showImagecompression = false
+
+[runner]
+magicEnabled = true

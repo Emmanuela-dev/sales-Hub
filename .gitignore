@@ -1,0 +1,83 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.pyc
+*.pyo
+__pycache__/
+*.egg-info/
+.DS_Store
+
+# Python
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+
+# Streamlit
+.streamlit/secrets.toml
+.streamlit/cache/
+cache/
+*.streamlit.run
+
+# Logs
+*.log
+logs/
+
+# Database
+*.sql.bak
+*.db
+*.sqlite
+database_backup/
+*.dump
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+
+# IDE temporary
+.vscode/settings.json
+.vscode/launch.json
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Security
+*.key
+*.pem
+*.p12
+*.pfx
