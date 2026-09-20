@@ -13,7 +13,7 @@ import pandas as pd
 DB_CONFIG = {
     'host': 'localhost',
     'user': 'root',
-    'password': 'your_password',  # Change to your MySQL password
+    'password': "",  # Change to your MySQL password
     'database': 'sales_intelligence_hub',
     'raise_on_warnings': True,
     'autocommit': True
