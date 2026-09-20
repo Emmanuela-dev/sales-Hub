@@ -21,18 +21,30 @@ def render_sales_form():
         with col1:
             # Get current user's branch or allow selection if Super Admin
             user = AuthenticationManager.get_current_user()
+            if not user:
+                st.error("Session expired. Please log in again.")
+                return
             branches_df = DatabaseConnection.fetch_dataframe(sql_queries.QUERY_ALL_BRANCHES)
             
-            if user['role'] == 'Super Admin' and branches_df is not None:
+            if user['role'] == 'Super Admin':
+                if branches_df is None or branches_df.empty:
+                    st.warning("⚠️ No branches found. Please add branches to the database first.")
+                    st.form_submit_button("✓ Add Sale", use_container_width=True, disabled=True)
+                    return
                 branch_options = dict(zip(branches_df['branch_name'], branches_df['branch_id']))
                 branch_name = st.selectbox("Branch", list(branch_options.keys()))
                 branch_id = branch_options[branch_name]
             else:
                 branch_id = user['branch_id']
-                branch_name = DatabaseConnection.fetch_one(
+                branch_result = DatabaseConnection.fetch_one(
                     "SELECT branch_name FROM branches WHERE branch_id = %s",
                     (branch_id,)
-                )[0]
+                )
+                if not branch_result:
+                    st.warning("⚠️ Your account is not assigned to a valid branch. Please contact your administrator.")
+                    st.form_submit_button("✓ Add Sale", use_container_width=True, disabled=True)
+                    return
+                branch_name = branch_result[0]
                 st.write(f"**Branch:** {branch_name}")
             
             customer_name = st.text_input("Customer Name", placeholder="Enter customer name")
@@ -180,7 +192,9 @@ def render_sales_filters_and_table():
         display_df['Sale Amt'] = display_df['Sale Amt'].apply(lambda x: f"${x:,.2f}")
         display_df['Received'] = display_df['Received'].apply(lambda x: f"${x:,.2f}")
         display_df['Pending'] = display_df['Pending'].apply(lambda x: f"${x:,.2f}")
-        display_df['Date'] = display_df['Date'].dt.strftime('%Y-%m-%d')
+        display_df['Date'] = display_df['Date'].apply(
+            lambda v: v.strftime('%Y-%m-%d') if hasattr(v, 'strftime') else str(v) if v else ""
+        )
         
         st.dataframe(display_df, use_container_width=True, hide_index=True)
         

@@ -13,10 +13,13 @@ import sql_queries
 def render_payment_form():
     """Render form to add new payment"""
     
-    st.markdown("<h3 style='color: #1e293b;'>➕ Record Payment</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color: #1e293b;'> Record Payment</h3>", unsafe_allow_html=True)
     
     # Get open sales
     user = AuthenticationManager.get_current_user()
+    if not user:
+        st.error("Session expired. Please log in again.")
+        return
     
     if user['role'] == 'Super Admin':
         open_sales_query = """
@@ -137,12 +140,15 @@ def render_payment_form():
 def render_payment_history():
     """Render payment history table"""
     
-    st.markdown("<h3 style='color: #1e293b;'>📊 Payment History</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color: #1e293b;'>Payment History</h3>", unsafe_allow_html=True)
     
     # Filters
     col1, col2, col3 = st.columns(3)
     
     user = AuthenticationManager.get_current_user()
+    if not user:
+        st.error("Session expired. Please log in again.")
+        return
     
     with col1:
         if user['role'] == 'Super Admin':
@@ -216,7 +222,9 @@ def render_payment_history():
         
         display_df.columns = ['ID', 'Sale ID', 'Customer', 'Branch', 'Amount', 'Method', 'Date', 'Reference']
         display_df['Amount'] = display_df['Amount'].apply(lambda x: f"${x:,.2f}")
-        display_df['Date'] = display_df['Date'].dt.strftime('%Y-%m-%d')
+        display_df['Date'] = display_df['Date'].apply(
+            lambda v: v.strftime('%Y-%m-%d') if hasattr(v, 'strftime') else str(v) if v else ""
+        )
         
         st.dataframe(display_df, use_container_width=True, hide_index=True)
         
@@ -244,9 +252,12 @@ def render_payment_history():
 def render_pending_collections():
     """Render pending collections table"""
     
-    st.markdown("<h3 style='color: #1e293b;'>⏳ Pending Collections</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color: #1e293b;'>Pending Collections</h3>", unsafe_allow_html=True)
     
     user = AuthenticationManager.get_current_user()
+    if not user:
+        st.error("Session expired. Please log in again.")
+        return
     
     # Get pending collections
     pending_df = DatabaseConnection.fetch_dataframe(sql_queries.QUERY_PENDING_COLLECTIONS)
@@ -299,7 +310,7 @@ def main():
     
     st.markdown("""
         <div style='padding: 20px 0; border-bottom: 1px solid #e2e8f0;'>
-            <h1 style='color: #1e293b; margin: 0; font-size: 32px;'>💳 Payment Management</h1>
+            <h1 style='color: #1e293b; margin: 0; font-size: 32px;'>Payment Management</h1>
             <p style='color: #64748b; margin: 5px 0 0 0; font-size: 14px;'>
                 Record payments and track collection status
             </p>

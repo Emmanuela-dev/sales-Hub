@@ -116,7 +116,7 @@ GROUP BY payment_status
 
 QUERY_MONTHLY_SALES_TREND = """
 SELECT 
-    DATE_TRUNC(DATE(sale_date), MONTH) as month,
+    DATE_FORMAT(sale_date, '%Y-%m-01') as month,
     YEAR(sale_date) as year,
     MONTH(sale_date) as month_num,
     COUNT(*) as sales_count,

@@ -122,7 +122,7 @@ def render_dashboard():
     # Header
     st.markdown("""
         <div style='padding: 20px 0; border-bottom: 1px solid #e2e8f0;'>
-            <h1 style='color: #1e293b; margin: 0; font-size: 32px;'>📊 Dashboard</h1>
+            <h1 style='color: #1e293b; margin: 0; font-size: 32px;'>Dashboard</h1>
             <p style='color: #64748b; margin: 5px 0 0 0; font-size: 14px;'>
                 Last 30 Days Performance Metrics
             </p>
@@ -153,7 +153,7 @@ def render_dashboard():
     st.markdown("")
     
     # Charts Section
-    tab1, tab2, tab3, tab4 = st.tabs(["📈 Sales Trends", "🏢 Branch Analytics", "💳 Payment Methods", "📊 Status Distribution"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Sales Trends", " Branch Analytics", "Payment Methods", "📊 Status Distribution"])
     
     # Tab 1: Sales Trends
     with tab1:
@@ -336,7 +336,7 @@ def render_dashboard():
     col_top, col_pending = st.columns(2)
     
     with col_top:
-        st.markdown("<h3 style='color: #1e293b; margin-top: 0;'>🏆 Top Performing Branches</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color: #1e293b; margin-top: 0;'> Top Performing Branches</h3>", unsafe_allow_html=True)
         
         top_branches = DatabaseConnection.fetch_dataframe(sql_queries.QUERY_TOP_BRANCHES)
         
@@ -348,7 +348,7 @@ def render_dashboard():
             st.info("No branch data")
     
     with col_pending:
-        st.markdown("<h3 style='color: #1e293b; margin-top: 0;'>⏳ Highest Pending Collections</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color: #1e293b; margin-top: 0;'> Highest Pending Collections</h3>", unsafe_allow_html=True)
         
         pending = DatabaseConnection.fetch_dataframe(sql_queries.QUERY_PENDING_COLLECTIONS)
         

@@ -17,7 +17,7 @@ import pages.reports as reports
 
 st.set_page_config(
     page_title="Sales Intelligence Hub",
-    page_icon="📊",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
@@ -190,7 +190,7 @@ def render_sidebar():
                 margin-bottom: 30px;
                 color: white;
             '>
-                <h2 style='margin: 0; font-size: 24px; color: white;'>📊</h2>
+                <h2 style='margin: 0; font-size: 24px; color: white;'></h2>
                 <h3 style='margin: 10px 0 0 0; font-size: 18px; color: white; font-weight: 700;'>
                     Sales Intelligence
                 </h3>
@@ -234,20 +234,20 @@ def render_sidebar():
             col1, col2 = st.columns([1, 1])
             
             with col1:
-                if st.button("🏠 Dashboard", use_container_width=True, key="nav_dashboard"):
+                if st.button(" Dashboard", use_container_width=True, key="nav_dashboard"):
                     st.session_state.page = "Dashboard"
                     st.rerun()
                 
-                if st.button("💰 Sales", use_container_width=True, key="nav_sales"):
+                if st.button(" Sales", use_container_width=True, key="nav_sales"):
                     st.session_state.page = "Sales"
                     st.rerun()
             
             with col2:
-                if st.button("💳 Payments", use_container_width=True, key="nav_payments"):
+                if st.button(" Payments", use_container_width=True, key="nav_payments"):
                     st.session_state.page = "Payments"
                     st.rerun()
                 
-                if st.button("📈 Reports", use_container_width=True, key="nav_reports"):
+                if st.button(" Reports", use_container_width=True, key="nav_reports"):
                     st.session_state.page = "Reports"
                     st.rerun()
         
@@ -256,7 +256,7 @@ def render_sidebar():
         # Admin section
         if user and user['role'] in ['Super Admin', 'Admin']:
             st.markdown("<p style='color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 15px;'><strong>Admin</strong></p>", unsafe_allow_html=True)
-            st.info("💡 Admin features coming in v2.0")
+            st.info(" Admin features coming in v2.0")
         
         st.markdown("---")
         
@@ -264,12 +264,12 @@ def render_sidebar():
         col_logout1, col_logout2 = st.columns([1, 1])
         
         with col_logout1:
-            if st.button("🚪 Logout", use_container_width=True):
+            if st.button(" Logout", use_container_width=True):
                 AuthenticationManager.logout()
                 st.rerun()
         
         with col_logout2:
-            if st.button("ℹ️ About", use_container_width=True):
+            if st.button("About", use_container_width=True):
                 st.session_state.page = "About"
                 st.rerun()
         
@@ -297,7 +297,7 @@ def render_about_page():
     st.markdown("""
         <div style='padding: 40px 0;'>
             <h1 style='color: #1e293b; text-align: center; font-size: 36px; margin-bottom: 20px;'>
-                📊 Sales Intelligence Hub
+                Sales Intelligence Hub
             </h1>
             <p style='color: #64748b; text-align: center; font-size: 16px; margin-bottom: 40px;'>
                 Professional Business Intelligence & Sales Management Platform

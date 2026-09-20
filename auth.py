@@ -182,8 +182,12 @@ class AuthenticationManager:
 
 def initialize_auth():
     """Initialize authentication on app startup"""
-    if AuthenticationManager.SESSION_KEY not in st.session_state:
-        st.session_state[AuthenticationManager.SESSION_KEY] = None
+    # Do NOT set the key to None — that would make is_logged_in() return True
+    # while get_current_user() returns None, crashing every role check.
+    # We only ensure any stale None value is cleaned up.
+    if st.session_state.get(AuthenticationManager.SESSION_KEY) is None:
+        if AuthenticationManager.SESSION_KEY in st.session_state:
+            del st.session_state[AuthenticationManager.SESSION_KEY]
 
 
 def show_login_page():

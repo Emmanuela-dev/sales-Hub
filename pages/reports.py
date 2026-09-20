@@ -12,45 +12,68 @@ from db_connection import DatabaseConnection
 from auth import AuthenticationManager
 import sql_queries
 
+def _fmt_currency(value) -> str:
+    """Format a value as currency, returning Ksh0.00 for None/NaN."""
+    try:
+        return f"${float(value):,.2f}"
+    except (TypeError, ValueError):
+        return "Ksh0.00"
+
+def _fmt_percent(value) -> str:
+    """Format a value as percentage, returning 0.0% for None/NaN."""
+    try:
+        return f"{float(value):.1f}%"
+    except (TypeError, ValueError):
+        return "0.0%"
+
+def _fmt_int(value) -> str:
+    """Format a value as integer string, returning 0 for None/NaN."""
+    try:
+        return str(int(float(value)))
+    except (TypeError, ValueError):
+        return "0"
+
+def _fmt_date(value, fmt='%Y-%m-%d') -> str:
+    """Format a date/datetime/string value safely, returning empty string on failure."""
+    if value is None:
+        return ""
+    try:
+        if hasattr(value, 'strftime'):          # date or datetime object
+            return value.strftime(fmt)
+        return pd.to_datetime(value).strftime(fmt)
+    except Exception:
+        return str(value)
+    except (TypeError, ValueError):
+        return "0"
+
 def render_revenue_analysis():
     """Render revenue analysis report"""
     
-    st.markdown("<h3 style='color: #1e293b;'>💰 Revenue Analysis</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color: #1e293b;'> Revenue Analysis</h3>", unsafe_allow_html=True)
     
     # Get revenue data
     revenue_df = DatabaseConnection.fetch_dataframe(sql_queries.QUERY_TOTAL_REVENUE_ANALYSIS)
     
     if revenue_df is not None and not revenue_df.empty:
+        row = revenue_df.iloc[0]
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            st.metric(
-                "Total Sales",
-                f"${revenue_df.iloc[0]['total_sales']:,.2f}"
-            )
+            st.metric("Total Sales", _fmt_currency(row.get('total_sales')))
         
         with col2:
-            st.metric(
-                "Total Received",
-                f"${revenue_df.iloc[0]['total_received']:,.2f}"
-            )
+            st.metric("Total Received", _fmt_currency(row.get('total_received')))
         
         with col3:
-            st.metric(
-                "Total Pending",
-                f"${revenue_df.iloc[0]['total_pending']:,.2f}"
-            )
+            st.metric("Total Pending", _fmt_currency(row.get('total_pending')))
         
         with col4:
-            st.metric(
-                "Collection Rate",
-                f"{revenue_df.iloc[0]['collection_rate']:.1f}%"
-            )
+            st.metric("Collection Rate", _fmt_percent(row.get('collection_rate')))
 
 def render_branch_performance():
     """Render branch performance report"""
     
-    st.markdown("<h3 style='color: #1e293b;'>🏢 Branch Performance Report</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color: #1e293b;'> Branch Performance Report</h3>", unsafe_allow_html=True)
     
     branch_df = DatabaseConnection.fetch_dataframe(sql_queries.QUERY_BRANCH_EFFICIENCY)
     
@@ -61,8 +84,8 @@ def render_branch_performance():
         ]].copy()
         
         display_df.columns = ['Branch', 'Total Sales', 'Closed', 'Closing %', 'Avg Days Open']
-        display_df['Closing %'] = display_df['Closing %'].apply(lambda x: f"{x:.1f}%")
-        display_df['Avg Days Open'] = display_df['Avg Days Open'].apply(lambda x: f"{int(x)}" if pd.notna(x) else "0")
+        display_df['Closing %'] = display_df['Closing %'].apply(_fmt_percent)
+        display_df['Avg Days Open'] = display_df['Avg Days Open'].apply(_fmt_int)
         
         st.dataframe(display_df, use_container_width=True, hide_index=True)
         
@@ -103,7 +126,7 @@ def render_branch_performance():
 def render_collection_efficiency():
     """Render collection efficiency report"""
     
-    st.markdown("<h3 style='color: #1e293b;'>📊 Collection Efficiency Report</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color: #1e293b;'> Collection Efficiency Report</h3>", unsafe_allow_html=True)
     
     collection_df = DatabaseConnection.fetch_dataframe(sql_queries.QUERY_COLLECTION_EFFICIENCY)
     
@@ -114,17 +137,17 @@ def render_collection_efficiency():
         ]].copy()
         
         display_df.columns = ['Branch', 'Total Sales', 'Collected', 'Total Amount', 'Collected Amt', 'Collection %', 'Avg Days']
-        display_df['Total Amount'] = display_df['Total Amount'].apply(lambda x: f"${x:,.2f}")
-        display_df['Collected Amt'] = display_df['Collected Amt'].apply(lambda x: f"${x:,.2f}")
-        display_df['Collection %'] = display_df['Collection %'].apply(lambda x: f"{x:.1f}%")
-        display_df['Avg Days'] = display_df['Avg Days'].apply(lambda x: f"{int(x)}" if pd.notna(x) else "N/A")
+        display_df['Total Amount'] = display_df['Total Amount'].apply(_fmt_currency)
+        display_df['Collected Amt'] = display_df['Collected Amt'].apply(_fmt_currency)
+        display_df['Collection %'] = display_df['Collection %'].apply(_fmt_percent)
+        display_df['Avg Days'] = display_df['Avg Days'].apply(_fmt_int)
         
         st.dataframe(display_df, use_container_width=True, hide_index=True)
 
 def render_top_sales():
     """Render highest sales report"""
     
-    st.markdown("<h3 style='color: #1e293b;'>🏆 Top Sales Records</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color: #1e293b;'> Top Sales Records</h3>", unsafe_allow_html=True)
     
     top_sales_df = DatabaseConnection.fetch_dataframe(sql_queries.QUERY_HIGHEST_SALES)
     
@@ -135,16 +158,16 @@ def render_top_sales():
         ]].copy()
         
         display_df.columns = ['ID', 'Customer', 'Branch', 'Category', 'Amount', 'Received', 'Status', 'Date']
-        display_df['Amount'] = display_df['Amount'].apply(lambda x: f"${x:,.2f}")
-        display_df['Received'] = display_df['Received'].apply(lambda x: f"${x:,.2f}")
-        display_df['Date'] = display_df['Date'].dt.strftime('%Y-%m-%d')
+        display_df['Amount'] = display_df['Amount'].apply(_fmt_currency)
+        display_df['Received'] = display_df['Received'].apply(_fmt_currency)
+        display_df['Date'] = display_df['Date'].apply(_fmt_date)
         
         st.dataframe(display_df, use_container_width=True, hide_index=True)
 
 def render_top_customers():
     """Render top customers report"""
     
-    st.markdown("<h3 style='color: #1e293b;'>👥 Top Customers by Sales</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color: #1e293b;'> Top Customers by Sales</h3>", unsafe_allow_html=True)
     
     customers_df = DatabaseConnection.fetch_dataframe(sql_queries.QUERY_TOP_CUSTOMERS)
     
@@ -154,8 +177,8 @@ def render_top_customers():
         ]].copy()
         
         display_df.columns = ['Customer', 'Branch', 'Purchases', 'Total', 'Paid']
-        display_df['Total'] = display_df['Total'].apply(lambda x: f"${x:,.2f}")
-        display_df['Paid'] = display_df['Paid'].apply(lambda x: f"${x:,.2f}")
+        display_df['Total'] = display_df['Total'].apply(_fmt_currency)
+        display_df['Paid'] = display_df['Paid'].apply(_fmt_currency)
         
         st.dataframe(display_df, use_container_width=True, hide_index=True)
         
@@ -196,7 +219,7 @@ def render_top_customers():
 def render_payment_method_analysis():
     """Render payment method analysis"""
     
-    st.markdown("<h3 style='color: #1e293b;'>💳 Payment Method Analysis</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color: #1e293b;'> Payment Method Analysis</h3>", unsafe_allow_html=True)
     
     payment_df = DatabaseConnection.fetch_dataframe(sql_queries.QUERY_PAYMENT_METHOD_BREAKDOWN)
     
@@ -206,8 +229,8 @@ def render_payment_method_analysis():
         ]].copy()
         
         display_df.columns = ['Method', 'Transactions', 'Amount', 'Percentage']
-        display_df['Amount'] = display_df['Amount'].apply(lambda x: f"${x:,.2f}")
-        display_df['Percentage'] = display_df['Percentage'].apply(lambda x: f"{x:.1f}%")
+        display_df['Amount'] = display_df['Amount'].apply(_fmt_currency)
+        display_df['Percentage'] = display_df['Percentage'].apply(_fmt_percent)
         
         st.dataframe(display_df, use_container_width=True, hide_index=True)
         
@@ -269,7 +292,7 @@ def render_payment_method_analysis():
 def render_category_analysis():
     """Render product category analysis"""
     
-    st.markdown("<h3 style='color: #1e293b;'>📦 Product Category Analysis</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color: #1e293b;'>Product Category Analysis</h3>", unsafe_allow_html=True)
     
     category_df = DatabaseConnection.fetch_dataframe(sql_queries.QUERY_PRODUCT_CATEGORY_BREAKDOWN)
     
@@ -279,9 +302,9 @@ def render_category_analysis():
         ]].copy()
         
         display_df.columns = ['Category', 'Count', 'Total', 'Received', 'Collection %']
-        display_df['Total'] = display_df['Total'].apply(lambda x: f"${x:,.2f}")
-        display_df['Received'] = display_df['Received'].apply(lambda x: f"${x:,.2f}")
-        display_df['Collection %'] = display_df['Collection %'].apply(lambda x: f"{x:.1f}%" if pd.notna(x) else "N/A")
+        display_df['Total'] = display_df['Total'].apply(_fmt_currency)
+        display_df['Received'] = display_df['Received'].apply(_fmt_currency)
+        display_df['Collection %'] = display_df['Collection %'].apply(_fmt_percent)
         
         st.dataframe(display_df, use_container_width=True, hide_index=True)
         
@@ -322,7 +345,7 @@ def render_category_analysis():
 def render_overdue_analysis():
     """Render overdue collections analysis"""
     
-    st.markdown("<h3 style='color: #1e293b;'>⚠️ Overdue Collections (>30 Days)</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color: #1e293b;'> Overdue Collections (>30 Days)</h3>", unsafe_allow_html=True)
     
     overdue_df = DatabaseConnection.fetch_dataframe(sql_queries.QUERY_OVERDUE_COLLECTIONS)
     
@@ -332,7 +355,7 @@ def render_overdue_analysis():
         ]].copy()
         
         display_df.columns = ['Sale ID', 'Customer', 'Branch', 'Pending', 'Days Overdue']
-        display_df['Pending'] = display_df['Pending'].apply(lambda x: f"${x:,.2f}")
+        display_df['Pending'] = display_df['Pending'].apply(_fmt_currency)
         
         st.dataframe(display_df, use_container_width=True, hide_index=True)
         
@@ -358,7 +381,7 @@ def main():
     
     st.markdown("""
         <div style='padding: 20px 0; border-bottom: 1px solid #e2e8f0;'>
-            <h1 style='color: #1e293b; margin: 0; font-size: 32px;'>📈 Reports & Analytics</h1>
+            <h1 style='color: #1e293b; margin: 0; font-size: 32px;'> Reports & Analytics</h1>
             <p style='color: #64748b; margin: 5px 0 0 0; font-size: 14px;'>
                 Comprehensive business intelligence and analytics
             </p>
