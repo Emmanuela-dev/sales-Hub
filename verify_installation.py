@@ -1,7 +1,4 @@
-"""
-Sales Intelligence Hub - Installation Verification Script
-Run this script to verify all components are properly installed and configured
-"""
+"""Verify the Glamour Hub internal operations installation."""
 
 import sys
 import os
@@ -62,7 +59,8 @@ def check_project_files():
         'database/sample_data.sql',
         'pages/dashboard.py',
         'pages/sales.py',
-        'pages/payments.py',
+        'pages/inventory.py',
+        'pages/expenses.py',
         'pages/reports.py'
     ]
     
@@ -99,12 +97,15 @@ def check_database_structure():
     try:
         from db_connection import DatabaseConnection
         
-        tables = ['users', 'branches', 'customer_sales', 'payment_splits']
+        tables = [
+            'users', 'product_categories', 'products', 'sales',
+            'sale_items', 'stock_movements', 'expenses', 'staff_attendance'
+        ]
         
         all_exist = True
         for table in tables:
             result = DatabaseConnection.fetch_one(
-                f"SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = 'sales_intelligence_hub' AND TABLE_NAME = '{table}'"
+                f"SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = 'glamour_hub' AND TABLE_NAME = '{table}'"
             )
             if result:
                 print(f"  ✅ {table}")
@@ -125,16 +126,16 @@ def check_triggers():
         from db_connection import DatabaseConnection
         
         result = DatabaseConnection.fetch_one(
-            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TRIGGERS WHERE TRIGGER_SCHEMA = 'sales_intelligence_hub'"
+            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TRIGGERS WHERE TRIGGER_SCHEMA = 'glamour_hub'"
         )
         
         trigger_count = result[0] if result else 0
         
-        if trigger_count >= 3:
+        if trigger_count >= 1:
             print(f"  ✅ {trigger_count} triggers installed")
             return True
         else:
-            print(f"  ❌ Only {trigger_count} triggers found (expected: 3)")
+            print(f"  ❌ Only {trigger_count} triggers found (expected: 1 or more)")
             return False
     except Exception as e:
         print(f"  ❌ Trigger check error: {e}")
@@ -147,23 +148,18 @@ def check_sample_data():
     try:
         from db_connection import DatabaseConnection
         
-        # Check branches
-        result = DatabaseConnection.fetch_one("SELECT COUNT(*) FROM branches")
-        branches_count = result[0] if result else 0
+        result = DatabaseConnection.fetch_one("SELECT COUNT(*) FROM products")
+        products_count = result[0] if result else 0
         
         # Check sales
-        result = DatabaseConnection.fetch_one("SELECT COUNT(*) FROM customer_sales")
+        result = DatabaseConnection.fetch_one("SELECT COUNT(*) FROM sales")
         sales_count = result[0] if result else 0
         
         # Check payments
-        result = DatabaseConnection.fetch_one("SELECT COUNT(*) FROM payment_splits")
-        payments_count = result[0] if result else 0
-        
-        print(f"  ✅ Branches: {branches_count}")
+        print(f"  ✅ Products: {products_count}")
         print(f"  ✅ Sales: {sales_count}")
-        print(f"  ✅ Payments: {payments_count}")
         
-        return branches_count > 0 and sales_count > 0 and payments_count > 0
+        return products_count > 0 and sales_count > 0
     except Exception as e:
         print(f"  ⚠️  Data check error: {e}")
         return False
@@ -197,7 +193,7 @@ def print_summary(results):
 def main():
     """Run all verification checks"""
     
-    print_header("SALES INTELLIGENCE HUB - INSTALLATION VERIFICATION")
+    print_header("GLAMOUR HUB - INSTALLATION VERIFICATION")
     
     results = {
         'Python Version': check_python_version(),

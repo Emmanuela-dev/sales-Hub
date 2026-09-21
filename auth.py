@@ -50,18 +50,22 @@ class AuthenticationManager:
             if user_data is None:
                 return None
             
-            user_id, stored_username, email, role, branch_id, is_active, password_hash = user_data
-            
+            user_id, stored_username, full_name, email, phone, password_hash, role, is_active = user_data
+
             if not is_active:
                 return None
-            
+
             if AuthenticationManager.verify_password(password_hash, password):
+                # Update last login
+                DatabaseConnection.execute_query(
+                    sql_queries.QUERY_UPDATE_LAST_LOGIN, (user_id,))
                 return {
-                    'user_id': user_id,
-                    'username': stored_username,
-                    'email': email,
-                    'role': role,
-                    'branch_id': branch_id,
+                    'user_id':   user_id,
+                    'username':  stored_username,
+                    'full_name': full_name,
+                    'email':     email,
+                    'phone':     phone,
+                    'role':      role,
                     'is_active': is_active
                 }
             
@@ -192,71 +196,63 @@ def initialize_auth():
 
 def show_login_page():
     """Display login page"""
-    col1, col2, col3 = st.columns([1, 2, 1])
-    
+    # Full-page login layout
+    st.markdown("""
+    <style>
+    .main { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important; }
+    #MainMenu, footer, header { visibility: hidden; }
+    </style>
+    """, unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns([1, 1.2, 1])
+
     with col2:
-        st.markdown("---")
-        st.markdown(
-            """
-            <div style='text-align: center; padding: 40px 0;'>
-                <h1 style='color: #1e293b; font-size: 32px; margin-bottom: 10px;'>
-                    📊 Sales Intelligence Hub
-                </h1>
-                <p style='color: #64748b; font-size: 16px;'>
-                    Professional Business Intelligence Platform
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-        st.markdown("---")
-        
-        col_space1, col_input, col_space2 = st.columns([0.5, 2, 0.5])
-        
-        with col_input:
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        st.markdown("""
+        <div style="text-align:center; margin-bottom:32px;">
+            <div style="font-size:52px;">📊</div>
+            <h1 style="color:#f1f5f9; font-size:28px; font-weight:700; margin:8px 0 4px 0;">
+                Sales Intelligence Hub
+            </h1>
+            <p style="color:#64748b; font-size:14px; margin:0;">Internal Operations v2.0</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        with st.container():
+            st.markdown("""
+            <div style="background:white; border-radius:16px; padding:32px 28px;
+                        box-shadow:0 20px 60px rgba(0,0,0,.4);">
+            """, unsafe_allow_html=True)
+
             st.markdown(
-                "<h3 style='color: #1e293b; text-align: center;'>Login to Your Account</h3>",
-                unsafe_allow_html=True
-            )
-            
+                "<h3 style='color:#1e293b; text-align:center; margin:0 0 24px 0;"
+                " font-size:18px;'>Sign in to your account</h3>",
+                unsafe_allow_html=True)
+
             username = st.text_input(
-                "Username",
-                placeholder="Enter your username",
-                key="login_username"
-            )
-            
+                "Username", placeholder="Enter your username", key="login_username")
             password = st.text_input(
-                "Password",
-                type="password",
-                placeholder="Enter your password",
-                key="login_password"
-            )
-            
-            col_btn1, col_btn2 = st.columns([1, 1])
-            
-            with col_btn1:
-                if st.button("🔐 Login", use_container_width=True, type="primary"):
-                    if username and password:
-                        if AuthenticationManager.login(username, password):
-                            st.success("✓ Login successful!")
-                            st.rerun()
-                        else:
-                            st.error("❌ Invalid username or password")
+                "Password", type="password",
+                placeholder="Enter your password", key="login_password")
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            if st.button("🔐 Sign In", use_container_width=True, type="primary"):
+                if username and password:
+                    if AuthenticationManager.login(username, password):
+                        st.success("✓ Login successful!")
+                        st.rerun()
                     else:
-                        st.warning("Please enter username and password")
-            
-            st.markdown("")
-            
-            st.markdown(
-                """
-                <p style='color: #64748b; font-size: 12px; text-align: center; margin-top: 30px;'>
-                    <strong>Demo Credentials:</strong><br>
-                    Username: <code>superadmin</code> | Password: <code>admin123</code><br>
-                    or<br>
-                    Username: <code>ny_admin</code> | Password: <code>admin123</code>
-                </p>
-                """,
-                unsafe_allow_html=True
-            )
-        
-        st.markdown("---")
+                        st.error("❌ Invalid username or password")
+                else:
+                    st.warning("Please enter your username and password.")
+
+            st.markdown("""
+            <p style="color:#94a3b8; font-size:12px; text-align:center;
+                       margin:20px 0 0 0; border-top:1px solid #f1f5f9; padding-top:16px;">
+                <strong>Demo:</strong> username <code>superadmin</code>
+                · password <code>admin123</code>
+            </p>
+            """, unsafe_allow_html=True)
+
+            st.markdown("</div>", unsafe_allow_html=True)
