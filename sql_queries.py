@@ -249,6 +249,46 @@ ORDER BY s.sale_time DESC
 LIMIT 15
 """
 
+# Staff: only their own sales today (with amounts — they need to know what they collected)
+QUERY_MY_SALES_TODAY = """
+SELECT
+    s.sale_id,
+    s.sale_time,
+    s.payment_method,
+    s.mpesa_ref,
+    s.status,
+    s.total_amount,
+    COALESCE(SUM(si.qty), 0) AS items_sold
+FROM sales s
+LEFT JOIN sale_items si ON s.sale_id = si.sale_id
+WHERE s.served_by = %s
+  AND s.sale_date = CURDATE()
+  AND s.status    = 'Completed'
+GROUP BY s.sale_id, s.sale_time, s.payment_method,
+         s.mpesa_ref, s.status, s.total_amount
+ORDER BY s.sale_time DESC
+"""
+
+# Staff: their own sales history (with amounts)
+QUERY_MY_SALES_HISTORY = """
+SELECT
+    s.sale_id,
+    s.sale_date,
+    s.sale_time,
+    s.payment_method,
+    s.mpesa_ref,
+    s.status,
+    s.total_amount,
+    COALESCE(SUM(si.qty), 0) AS items_sold
+FROM sales s
+LEFT JOIN sale_items si ON s.sale_id = si.sale_id
+WHERE s.served_by = %s
+  AND s.status    = 'Completed'
+GROUP BY s.sale_id, s.sale_date, s.sale_time,
+         s.payment_method, s.mpesa_ref, s.status, s.total_amount
+ORDER BY s.sale_date DESC, s.sale_time DESC
+"""
+
 # ============================================================
 # INVENTORY
 # ============================================================

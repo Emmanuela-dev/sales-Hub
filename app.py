@@ -1,6 +1,7 @@
 """
 Glamour Hub - Internal Business Operations System
 Sales, Inventory, Expenses, Reports, Staff Management.
+Staff see only their own work. Owner/Manager see everything.
 """
 
 import streamlit as st
@@ -65,15 +66,21 @@ html, body, [class*="css"] {
 """, unsafe_allow_html=True)
 
 # ── Navigation ────────────────────────────────────────────────────────────────
-# (label, icon, page_key, roles_allowed — None means everyone)
+# Staff see ONLY Sales/POS and their own dashboard.
+# Inventory, Expenses, Reports, Staff Accounts are Owner/Manager only.
 
-NAV_ITEMS = [
-    ("Dashboard",      "📊", "dashboard",  None),
-    ("Sales / POS",    "🛍", "sales",      None),
-    ("Inventory",      "📦", "inventory",  None),
-    ("Expenses",       "💼", "expenses",   None),
-    ("Reports",        "📈", "reports",    ["Owner", "Manager"]),
-    ("Staff Accounts", "👤", "staff",      ["Owner", "Manager"]),
+OWNER_MANAGER_NAV = [
+    ("Dashboard",      "📊", "dashboard"),
+    ("Sales / POS",    "🛍", "sales"),
+    ("Inventory",      "📦", "inventory"),
+    ("Expenses",       "💼", "expenses"),
+    ("Reports",        "📈", "reports"),
+    ("Staff Accounts", "👤", "staff"),
+]
+
+STAFF_NAV = [
+    ("My Dashboard",   "📊", "dashboard"),
+    ("Sales / POS",    "🛍", "sales"),
 ]
 
 ROUTER = {
@@ -85,9 +92,12 @@ ROUTER = {
     "staff":     staff.main,
 }
 
+# Pages staff are explicitly blocked from, even if they somehow navigate there
+STAFF_BLOCKED = {"inventory", "expenses", "reports", "staff"}
 
-def _can_access(roles_allowed, role: str) -> bool:
-    return roles_allowed is None or role in roles_allowed
+
+def _nav_items(role: str) -> list:
+    return STAFF_NAV if role == "Staff" else OWNER_MANAGER_NAV
 
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
@@ -133,9 +143,7 @@ def render_sidebar(user: dict):
 
         current = st.session_state.get("page", "dashboard")
 
-        for label, icon, key, roles in NAV_ITEMS:
-            if not _can_access(roles, role):
-                continue
+        for label, icon, key in _nav_items(role):
             css = "nav-btn-active nav-btn" if current == key else "nav-btn"
             st.markdown(f"<div class='{css}'>", unsafe_allow_html=True)
             if st.button(f"{icon}  {label}", key=f"nav_{key}",
@@ -149,18 +157,19 @@ def render_sidebar(user: dict):
             "margin:14px 0;'>",
             unsafe_allow_html=True)
 
-        # Low-stock alert badge
-        try:
-            low = DatabaseConnection.fetch_dataframe(sql_queries.QUERY_LOW_STOCK)
-            if low is not None and not low.empty:
-                st.markdown(f"""
-                <div style="margin:0 12px 10px;background:#dc262620;border-radius:8px;
-                            padding:8px 14px;border-left:3px solid #dc2626;">
-                    <p style="color:#fca5a5;font-size:12px;font-weight:600;margin:0;">
-                        📦 {len(low)} item(s) low / out of stock</p>
-                </div>""", unsafe_allow_html=True)
-        except Exception:
-            pass
+        # Low-stock alert badge — only for Owner/Manager
+        if role != "Staff":
+            try:
+                low = DatabaseConnection.fetch_dataframe(sql_queries.QUERY_LOW_STOCK)
+                if low is not None and not low.empty:
+                    st.markdown(f"""
+                    <div style="margin:0 12px 10px;background:#dc262620;border-radius:8px;
+                                padding:8px 14px;border-left:3px solid #dc2626;">
+                        <p style="color:#fca5a5;font-size:12px;font-weight:600;margin:0;">
+                            📦 {len(low)} item(s) low / out of stock</p>
+                    </div>""", unsafe_allow_html=True)
+            except Exception:
+                pass
 
         # Logout
         st.markdown("<div class='nav-btn'>", unsafe_allow_html=True)
@@ -207,13 +216,13 @@ def main():
     current = st.session_state.get("page", "dashboard")
     role    = user.get("role", "Staff")
 
-    # Access-gate: redirect to dashboard if user lacks permission
-    for _, _, key, roles in NAV_ITEMS:
-        if key == current and not _can_access(roles, role):
-            st.session_state.page = "dashboard"
-            st.rerun()
+    # Hard block: staff cannot access restricted pages
+    if role == "Staff" and current in STAFF_BLOCKED:
+        st.session_state.page = "dashboard"
+        st.rerun()
 
-    # Render the active page
+    # Render the active page, passing role context via session state
+    st.session_state["current_role"] = role
     ROUTER.get(current, dashboard.main)()
 
 

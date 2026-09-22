@@ -378,13 +378,20 @@ def main():
         st.error("Session expired. Please log in again.")
         st.stop()
 
-    now = datetime.now()
+    role = user.get("role", "Staff")
+    now  = datetime.now()
     greeting = (
         "Good morning" if now.hour < 12
         else "Good afternoon" if now.hour < 17
         else "Good evening"
     )
 
+    # ── Staff gets a completely different, privacy-respecting dashboard ──
+    if role == "Staff":
+        _staff_dashboard(user, now, greeting)
+        return
+
+    # ── Owner / Manager: full business dashboard ──
     st.markdown(f"""
     <div style="padding:16px 0 20px 0;border-bottom:1px solid #e2e8f0;margin-bottom:24px;">
         <h1 style="color:#1e293b;margin:0;font-size:26px;font-weight:700;">
@@ -399,11 +406,9 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Top KPI strip ──
     _today_kpis()
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ── Main layout ──
     tab1, tab2, tab3 = st.tabs([
         "📊 Today's Overview",
         "📈 Trends",
@@ -426,7 +431,6 @@ def main():
         st.markdown("<br>", unsafe_allow_html=True)
         _monthly_trend()
 
-        # 30-day daily chart
         st.markdown('<p class="section">📅 Daily Revenue — Last 30 Days</p>',
                     unsafe_allow_html=True)
         df30 = DatabaseConnection.fetch_dataframe(sql_queries.QUERY_LAST_30_DAYS)
@@ -456,6 +460,161 @@ def main():
         with col_b:
             _staff_status()
 
+
+# ── Staff-only dashboard ──────────────────────────────────────────────────────
+
+def _staff_dashboard(user: dict, now: datetime, greeting: str):
+    """
+    Stripped dashboard shown to Staff only.
+    No revenue totals, no profit, no stock info, no other staff data.
+    Just: their own sales today, payment method breakdown of THEIR sales,
+    and check-in / check-out.
+    """
+    uid = user["user_id"]
+
+    st.markdown(f"""
+    <div style="padding:16px 0 20px 0;border-bottom:1px solid #e2e8f0;margin-bottom:24px;">
+        <h1 style="color:#1e293b;margin:0;font-size:26px;font-weight:700;">
+            👋 {greeting}, {user.get('full_name','').split()[0]}
+        </h1>
+        <p style="color:#64748b;margin:4px 0 0 0;font-size:14px;">
+            {now.strftime('%A, %d %B %Y')} &nbsp;·&nbsp; {now.strftime('%I:%M %p')}
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ── Check-in status banner ──
+    att = DatabaseConnection.fetch_one(
+        sql_queries.QUERY_MY_ATTENDANCE_TODAY, (uid,))
+    check_in  = att[0] if att else None
+    check_out = att[1] if att else None
+
+    def _fmt_t(v):
+        if v is None: return "—"
+        try:
+            if hasattr(v,"strftime"): return v.strftime("%H:%M")
+            return str(v)[:5]
+        except: return str(v)
+
+    if check_in and not check_out:
+        st.markdown(
+            f'<div class="good-card">✅ You checked in at <strong>{_fmt_t(check_in)}</strong>. '
+            f'Have a great shift!</div>',
+            unsafe_allow_html=True)
+    elif check_in and check_out:
+        st.markdown(
+            f'<div class="info-card">You worked today: '
+            f'{_fmt_t(check_in)} — {_fmt_t(check_out)}</div>',
+            unsafe_allow_html=True)
+    else:
+        st.markdown(
+            '<div class="warn-card">⚠️ You haven\'t checked in yet today. '
+            'Go to <strong>Sales / POS → Check-In</strong> to clock in.</div>',
+            unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── My sales today ──
+    my_sales_df = DatabaseConnection.fetch_dataframe(
+        sql_queries.QUERY_MY_SALES_TODAY, params=(uid,))
+
+    my_count   = len(my_sales_df) if my_sales_df is not None else 0
+    my_total   = my_sales_df["total_amount"].apply(safe).sum() if my_sales_df is not None and not my_sales_df.empty else 0
+    total_items = 0
+    if my_sales_df is not None and not my_sales_df.empty and "items_sold" in my_sales_df.columns:
+        total_items = int(my_sales_df["items_sold"].apply(safe).sum())
+
+    # KPI cards — my own counts + my own collected amount
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.markdown(f"""
+        <div class="kpi" style="border-left:4px solid #3b82f6">
+            <p class="kpi-label">My Sales Today</p>
+            <p class="kpi-value">{my_count}</p>
+            <p class="kpi-sub neutral">transactions</p>
+        </div>""", unsafe_allow_html=True)
+    with c2:
+        st.markdown(f"""
+        <div class="kpi" style="border-left:4px solid #16a34a">
+            <p class="kpi-label">My Total Collected</p>
+            <p class="kpi-value">{kes(my_total)}</p>
+            <p class="kpi-sub neutral">from my sales today</p>
+        </div>""", unsafe_allow_html=True)
+    with c3:
+        st.markdown(f"""
+        <div class="kpi" style="border-left:4px solid #ec4899">
+            <p class="kpi-label">Items Sold</p>
+            <p class="kpi-value">{total_items}</p>
+            <p class="kpi-sub neutral">product units today</p>
+        </div>""", unsafe_allow_html=True)
+    with c4:
+        # Time on shift
+        duration = "—"
+        if check_in and not check_out:
+            try:
+                from datetime import datetime as dt
+                ci    = check_in if hasattr(check_in,"hour") else dt.strptime(str(check_in)[:5],"%H:%M").time()
+                ci_dt = dt.combine(datetime.today().date(), ci)
+                mins  = int((datetime.now() - ci_dt).total_seconds() / 60)
+                hours = mins // 60
+                duration = f"{hours}h {mins % 60}m" if hours else f"{mins}m"
+            except Exception:
+                pass
+        st.markdown(f"""
+        <div class="kpi" style="border-left:4px solid #8b5cf6">
+            <p class="kpi-label">Time on Shift</p>
+            <p class="kpi-value">{duration}</p>
+            <p class="kpi-sub neutral">since check-in</p>
+        </div>""", unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── My sales list — WITH amounts ──
+    st.markdown('<p class="section">🧾 My Sales Today</p>', unsafe_allow_html=True)
+
+    if my_sales_df is None or my_sales_df.empty:
+        st.info("No sales recorded yet today. Head to Sales / POS to start.")
+    else:
+        def _fmt_time(v):
+            if v is None: return ""
+            try:
+                if hasattr(v,"strftime"): return v.strftime("%H:%M")
+                return str(v)[:5]
+            except: return str(v)
+
+        for _, row in my_sales_df.iterrows():
+            icons  = {"M-Pesa":"📱","Cash":"💵","Card":"💳","Split":"🔀"}
+            icon   = icons.get(str(row.get("payment_method","")),"💰")
+            mpesa  = f" · {row['mpesa_ref']}" if row.get("mpesa_ref") else ""
+            amount = safe(row.get("total_amount", 0))
+            items  = int(safe(row.get("items_sold", 0)))
+            st.markdown(f"""
+            <div style="background:white;border-radius:8px;padding:12px 16px;
+                        border:1px solid #e2e8f0;margin-bottom:6px;
+                        display:flex;justify-content:space-between;align-items:center">
+                <div>
+                    <strong style="color:#1e293b">Sale #{row['sale_id']}</strong>
+                    <span style="color:#64748b;font-size:12px">
+                        &nbsp;·&nbsp; {_fmt_time(row.get('sale_time'))}
+                        &nbsp;·&nbsp; {items} item(s)
+                    </span><br>
+                    <span style="color:#64748b;font-size:12px">
+                        {icon} {row.get('payment_method','')}{mpesa}
+                    </span>
+                </div>
+                <span style="color:#16a34a;font-weight:700;font-size:16px">
+                    {kes(amount)}
+                </span>
+            </div>""", unsafe_allow_html=True)
+
+        # Running total at the bottom
+        st.markdown(f"""
+        <div style="background:#f0fdf4;border-radius:8px;padding:12px 16px;
+                    border:1px solid #bbf7d0;margin-top:8px;
+                    display:flex;justify-content:space-between;align-items:center">
+            <strong style="color:#166534">My Total Today ({my_count} sale(s))</strong>
+            <strong style="color:#16a34a;font-size:18px">{kes(my_total)}</strong>
+        </div>""", unsafe_allow_html=True)
 
 
 if __name__ == "__main__":

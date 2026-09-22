@@ -90,30 +90,71 @@ def _cart_subtotal():
     return sum(i["price"] * i["qty"] for i in st.session_state.cart)
 
 
-# ── Today KPIs ────────────────────────────────────────────────────────────────
+# ── Today KPIs — role-aware ───────────────────────────────────────────────────
 
-def _today_kpis():
-    row = DatabaseConnection.fetch_one(sql_queries.QUERY_TODAY_SUMMARY)
+def _today_kpis(user: dict):
+    role = user.get("role", "Staff")
+
+    if role == "Staff":
+        # Staff see only their own transaction count today — no money
+        uid     = user["user_id"]
+        my_df   = DatabaseConnection.fetch_dataframe(
+            sql_queries.QUERY_MY_SALES_TODAY, params=(uid,))
+        my_count = len(my_df) if my_df is not None else 0
+        items    = 0
+        if my_df is not None and not my_df.empty and "items_sold" in my_df.columns:
+            items = int(my_df["items_sold"].apply(safe).sum())
+
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown(f"""
+            <div class="kpi-mini" style="border-left-color:#3b82f6">
+                <p style="color:#64748b;font-size:11px;text-transform:uppercase;
+                          letter-spacing:.5px;margin:0">My Sales Today</p>
+                <p style="color:#1e293b;font-size:20px;font-weight:700;
+                          margin:5px 0 0 0">{my_count} transaction(s)</p>
+            </div>""", unsafe_allow_html=True)
+        with c2:
+            st.markdown(f"""
+            <div class="kpi-mini" style="border-left-color:#ec4899">
+                <p style="color:#64748b;font-size:11px;text-transform:uppercase;
+                          letter-spacing:.5px;margin:0">Items Sold Today</p>
+                <p style="color:#1e293b;font-size:20px;font-weight:700;
+                          margin:5px 0 0 0">{items} unit(s)</p>
+            </div>""", unsafe_allow_html=True)
+        return
+
+    # Owner / Manager — full figures
+    row  = DatabaseConnection.fetch_one(sql_queries.QUERY_TODAY_SUMMARY)
     txns    = int(safe(row[0] if row else 0))
     revenue = safe(row[1] if row else 0)
     disc    = safe(row[2] if row else 0)
 
-    c1,c2,c3,c4 = st.columns(4)
-    cards = [
-        (c1,"Transactions Today",str(txns),   "#3b82f6"),
-        (c2,"Revenue Today",     kes(revenue),"#16a34a"),
-        (c3,"Discounts Given",   kes(disc),   "#f59e0b"),
-        (c4,"Items Sold",        "Tracked in inventory", "#8b5cf6"),
-    ]
-    for col,label,value,color in cards:
-        with col:
-            st.markdown(f"""
-            <div class="kpi-mini" style="border-left-color:{color}">
-                <p style="color:#64748b;font-size:11px;text-transform:uppercase;
-                          letter-spacing:.5px;margin:0">{label}</p>
-                <p style="color:#1e293b;font-size:20px;font-weight:700;
-                          margin:5px 0 0 0">{value}</p>
-            </div>""", unsafe_allow_html=True)
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.markdown(f"""
+        <div class="kpi-mini" style="border-left-color:#3b82f6">
+            <p style="color:#64748b;font-size:11px;text-transform:uppercase;
+                      letter-spacing:.5px;margin:0">Transactions Today</p>
+            <p style="color:#1e293b;font-size:20px;font-weight:700;
+                      margin:5px 0 0 0">{txns}</p>
+        </div>""", unsafe_allow_html=True)
+    with c2:
+        st.markdown(f"""
+        <div class="kpi-mini" style="border-left-color:#16a34a">
+            <p style="color:#64748b;font-size:11px;text-transform:uppercase;
+                      letter-spacing:.5px;margin:0">Revenue Today</p>
+            <p style="color:#1e293b;font-size:20px;font-weight:700;
+                      margin:5px 0 0 0">{kes(revenue)}</p>
+        </div>""", unsafe_allow_html=True)
+    with c3:
+        st.markdown(f"""
+        <div class="kpi-mini" style="border-left-color:#f59e0b">
+            <p style="color:#64748b;font-size:11px;text-transform:uppercase;
+                      letter-spacing:.5px;margin:0">Discounts Given</p>
+            <p style="color:#1e293b;font-size:20px;font-weight:700;
+                      margin:5px 0 0 0">{kes(disc)}</p>
+        </div>""", unsafe_allow_html=True)
 
 
 # ── Point of Sale ─────────────────────────────────────────────────────────────
@@ -379,17 +420,77 @@ def _pos(user: dict):
             st.rerun()
 
 
-# ── Sales history ─────────────────────────────────────────────────────────────
+# ── Sales history — role-aware ────────────────────────────────────────────────
 
-def _sales_history():
+def _sales_history(user: dict):
+    role = user.get("role", "Staff")
     st.markdown('<p class="section">📋 Sales History</p>', unsafe_allow_html=True)
 
+    # Staff only see their own sales, no amounts
+    if role == "Staff":
+        df = DatabaseConnection.fetch_dataframe(
+            sql_queries.QUERY_MY_SALES_HISTORY, params=(user["user_id"],))
+        if df is None or df.empty:
+            st.info("You haven't recorded any sales yet.")
+            return
+
+        col1, col2 = st.columns(2)
+        with col1:
+            method_f = st.selectbox("Payment Method",
+                                    ["All","Cash","M-Pesa","Card","Split"],
+                                    key="sh_method_staff")
+        with col2:
+            period = st.selectbox("Period",
+                                  ["All Time","Today","This Week","This Month"],
+                                  key="sh_period_staff")
+
+        df["sale_date"] = pd.to_datetime(df["sale_date"], errors="coerce")
+        today = pd.Timestamp.today().normalize()
+        if period == "Today":
+            df = df[df["sale_date"] == today]
+        elif period == "This Week":
+            df = df[df["sale_date"] >= today - pd.Timedelta(days=today.weekday())]
+        elif period == "This Month":
+            df = df[df["sale_date"].dt.to_period("M") == today.to_period("M")]
+        if method_f != "All":
+            df = df[df["payment_method"] == method_f]
+
+        st.caption(f"{len(df)} transaction(s)")
+        for _, row in df.iterrows():
+            icons = {"M-Pesa":"📱","Cash":"💵","Card":"💳","Split":"🔀"}
+            icon  = icons.get(str(row.get("payment_method","")),"💰")
+            mpesa = f" · {row['mpesa_ref']}" if row.get("mpesa_ref") else ""
+            date_str = row["sale_date"].strftime("%d %b %Y") if hasattr(row["sale_date"],"strftime") else str(row["sale_date"])
+            time_str = str(row.get("sale_time",""))[:5]
+            items    = int(safe(row.get("items_sold",0)))
+            amount   = safe(row.get("total_amount", 0))
+            st.markdown(f"""
+            <div style="background:white;border-radius:8px;padding:12px 16px;
+                        border:1px solid #e2e8f0;margin-bottom:6px;
+                        display:flex;justify-content:space-between;align-items:center">
+                <div>
+                    <strong style="color:#1e293b">Sale #{row['sale_id']}</strong>
+                    <span style="color:#64748b;font-size:12px">
+                        &nbsp;·&nbsp; {date_str} {time_str}
+                        &nbsp;·&nbsp; {items} item(s)
+                    </span><br>
+                    <span style="color:#64748b;font-size:12px">
+                        {icon} {row.get('payment_method','')}{mpesa}
+                    </span>
+                </div>
+                <span style="color:#16a34a;font-weight:700;font-size:15px">
+                    {kes(amount)}
+                </span>
+            </div>""", unsafe_allow_html=True)
+        return
+
+    # ── Owner / Manager: full history with amounts ──
     df = DatabaseConnection.fetch_dataframe(sql_queries.QUERY_ALL_SALES)
     if df is None or df.empty:
         st.info("No sales recorded yet.")
         return
 
-    col1,col2,col3 = st.columns(3)
+    col1, col2, col3 = st.columns(3)
     with col1:
         search = st.text_input("🔍 Staff / payment method", key="sh_search")
     with col2:
@@ -418,33 +519,26 @@ def _sales_history():
         df = df[df["payment_method"] == method_f]
     if search:
         df = df[df["served_by"].str.contains(search,case=False,na=False) |
-            df["payment_method"].str.contains(search,case=False,na=False)]
+                df["payment_method"].str.contains(search,case=False,na=False)]
 
     if df.empty:
         st.info("No sales match your filters.")
         return
 
-    # Summary
     total = df["total_amount"].apply(safe).sum()
     disc  = df["discount_amount"].apply(safe).sum()
-    m1,m2,m3 = st.columns(3)
+    m1, m2, m3 = st.columns(3)
     m1.metric("Transactions", len(df))
     m2.metric("Total Revenue", kes(total))
     m3.metric("Discounts Given", kes(disc))
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Table with expandable receipt
     status_color = {"Completed":"#16a34a","Refunded":"#f59e0b","Void":"#dc2626"}
 
     for _, row in df.iterrows():
-        sc = status_color.get(str(row.get("status","")),"#64748b")
-        method_icons = {"M-Pesa":"📱","Cash":"💵","Card":"💳","Split":"🔀"}
-        icon = method_icons.get(str(row.get("payment_method","")),"💰")
-        disc_html = (
-            f" · <span style='color:#f59e0b'>Disc: "
-            f"{kes_full(row['discount_amount'])}</span>"
-            if safe(row.get("discount_amount",0)) > 0 else ""
-        )
+        sc   = status_color.get(str(row.get("status","")),"#64748b")
+        icons= {"M-Pesa":"📱","Cash":"💵","Card":"💳","Split":"🔀"}
+        icon = icons.get(str(row.get("payment_method","")),"💰")
 
         with st.expander(
             f"#{row['sale_id']}  {fmt_date(row.get('sale_date'))} "
@@ -453,7 +547,7 @@ def _sales_history():
             f"{kes_full(row.get('total_amount',0))}  "
             f"{icon} {row.get('payment_method','')}"
         ):
-            c1,c2 = st.columns(2)
+            c1, c2 = st.columns(2)
             with c1:
                 st.markdown(f"""
                 **Served by:** {row.get('served_by','—')}<br>
@@ -467,7 +561,6 @@ def _sales_history():
                 {f"**M-Pesa Ref:** {row.get('mpesa_ref','')}" if row.get('mpesa_ref') else ""}
                 """)
 
-            # Line items
             items_df = DatabaseConnection.fetch_dataframe(
                 sql_queries.QUERY_SALE_ITEMS, params=(int(row["sale_id"]),))
             if items_df is not None and not items_df.empty:
@@ -535,7 +628,7 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
-    _today_kpis()
+    _today_kpis(user)
     st.markdown("<br>", unsafe_allow_html=True)
 
     tab1, tab2, tab3 = st.tabs([
@@ -550,7 +643,7 @@ def main():
 
     with tab2:
         st.markdown("<br>", unsafe_allow_html=True)
-        _sales_history()
+        _sales_history(user)
 
     with tab3:
         st.markdown("<br>", unsafe_allow_html=True)
