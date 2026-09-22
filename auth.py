@@ -194,65 +194,158 @@ def initialize_auth():
             del st.session_state[AuthenticationManager.SESSION_KEY]
 
 
-def show_login_page():
-    """Display login page"""
-    # Full-page login layout
+def _no_users_exist() -> bool:
+    """Return True if the users table has zero rows."""
+    try:
+        result = DatabaseConnection.fetch_one("SELECT COUNT(*) FROM users")
+        return (result is None) or (int(result[0]) == 0)
+    except Exception:
+        return False
+
+
+def show_setup_wizard():
+    """
+    First-launch setup wizard — shown only when there are no users at all.
+    Creates the Owner account so the system can be used.
+    """
     st.markdown("""
     <style>
-    .main { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important; }
+    .main { background: linear-gradient(135deg, #1a0a2e 0%, #2d1b69 100%) !important; }
+    #MainMenu, footer, header { visibility: hidden; }
+    </style>
+    """, unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns([1, 1.4, 1])
+    with col2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("""
+        <div style="text-align:center;margin-bottom:28px;">
+            <div style="font-size:48px">💄</div>
+            <h1 style="color:#f9a8d4;font-size:26px;font-weight:700;margin:8px 0 4px 0">
+                Glamour Hub</h1>
+            <p style="color:#a78bfa;font-size:13px;margin:0">
+                Welcome! Let's set up your account first.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown("""
+        <div style="background:white;border-radius:16px;padding:32px 28px;
+                    box-shadow:0 20px 60px rgba(0,0,0,.5);">
+        """, unsafe_allow_html=True)
+
+        st.markdown("""
+        <h3 style="color:#1e293b;text-align:center;margin:0 0 6px 0;font-size:18px">
+            👑 Create Owner Account</h3>
+        <p style="color:#64748b;text-align:center;font-size:13px;margin:0 0 24px 0">
+            This is the main account for the business owner.
+            You can add managers and staff after logging in.
+        </p>
+        """, unsafe_allow_html=True)
+
+        full_name = st.text_input("Your Full Name *",
+                                  placeholder="e.g. Amina Wanjiku",
+                                  key="setup_name")
+        username  = st.text_input("Choose a Username *",
+                                  placeholder="e.g. amina_owner  (no spaces)",
+                                  key="setup_username")
+        phone     = st.text_input("Phone Number",
+                                  placeholder="0722 001 001",
+                                  key="setup_phone")
+        email     = st.text_input("Email (optional)",
+                                  placeholder="amina@glamourhub.co.ke",
+                                  key="setup_email")
+
+        st.markdown("<hr style='border:none;border-top:1px solid #f1f5f9;margin:16px 0'>",
+                    unsafe_allow_html=True)
+
+        password = st.text_input("Create Password *",
+                                 type="password",
+                                 placeholder="At least 6 characters",
+                                 key="setup_password")
+        confirm  = st.text_input("Confirm Password *",
+                                 type="password",
+                                 key="setup_confirm")
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        if st.button("🚀 Set Up My Account", use_container_width=True,
+                     type="primary", key="setup_submit"):
+            # Validation
+            if not full_name or not username or not password:
+                st.error("Full name, username, and password are all required.")
+            elif " " in username:
+                st.error("Username cannot contain spaces.")
+            elif len(password) < 6:
+                st.error("Password must be at least 6 characters.")
+            elif password != confirm:
+                st.error("Passwords do not match.")
+            else:
+                pw_hash = AuthenticationManager.hash_password(password)
+                ok = DatabaseConnection.execute_query(
+                    """INSERT INTO users
+                       (username, full_name, email, phone, password_hash, role, is_active)
+                       VALUES (%s, %s, %s, %s, %s, 'Owner', TRUE)""",
+                    (username, full_name, email or None, phone or None, pw_hash)
+                )
+                if ok:
+                    st.success(
+                        f"✅ Account created! Welcome, **{full_name}**. "
+                        "Please sign in below.")
+                    st.rerun()
+                else:
+                    st.error("Something went wrong. Please try again.")
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+
+def show_login_page():
+    """Display login page — shown when users exist but nobody is logged in."""
+    st.markdown("""
+    <style>
+    .main { background: linear-gradient(135deg, #1a0a2e 0%, #2d1b69 100%) !important; }
     #MainMenu, footer, header { visibility: hidden; }
     </style>
     """, unsafe_allow_html=True)
 
     col1, col2, col3 = st.columns([1, 1.2, 1])
-
     with col2:
         st.markdown("<br><br>", unsafe_allow_html=True)
         st.markdown("""
-        <div style="text-align:center; margin-bottom:32px;">
-            <div style="font-size:52px;">📊</div>
-            <h1 style="color:#f1f5f9; font-size:28px; font-weight:700; margin:8px 0 4px 0;">
-                Sales Intelligence Hub
-            </h1>
-            <p style="color:#64748b; font-size:14px; margin:0;">Internal Operations v2.0</p>
+        <div style="text-align:center;margin-bottom:28px;">
+            <div style="font-size:48px">💄</div>
+            <h1 style="color:#f9a8d4;font-size:26px;font-weight:700;margin:8px 0 4px 0">
+                Glamour Hub</h1>
+            <p style="color:#a78bfa;font-size:13px;margin:0">
+                Beauty Business Manager</p>
         </div>
         """, unsafe_allow_html=True)
 
-        with st.container():
-            st.markdown("""
-            <div style="background:white; border-radius:16px; padding:32px 28px;
-                        box-shadow:0 20px 60px rgba(0,0,0,.4);">
-            """, unsafe_allow_html=True)
+        st.markdown("""
+        <div style="background:white;border-radius:16px;padding:32px 28px;
+                    box-shadow:0 20px 60px rgba(0,0,0,.5);">
+        """, unsafe_allow_html=True)
 
-            st.markdown(
-                "<h3 style='color:#1e293b; text-align:center; margin:0 0 24px 0;"
-                " font-size:18px;'>Sign in to your account</h3>",
-                unsafe_allow_html=True)
+        st.markdown(
+            "<h3 style='color:#1e293b;text-align:center;margin:0 0 24px 0;"
+            "font-size:18px'>Sign in to your account</h3>",
+            unsafe_allow_html=True)
 
-            username = st.text_input(
-                "Username", placeholder="Enter your username", key="login_username")
-            password = st.text_input(
-                "Password", type="password",
-                placeholder="Enter your password", key="login_password")
+        username = st.text_input("Username", placeholder="Enter your username",
+                                 key="login_username")
+        password = st.text_input("Password", type="password",
+                                 placeholder="Enter your password",
+                                 key="login_password")
 
-            st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
 
-            if st.button("🔐 Sign In", use_container_width=True, type="primary"):
-                if username and password:
-                    if AuthenticationManager.login(username, password):
-                        st.success("✓ Login successful!")
-                        st.rerun()
-                    else:
-                        st.error("❌ Invalid username or password")
+        if st.button("🔐 Sign In", use_container_width=True,
+                     type="primary", key="login_submit"):
+            if username and password:
+                if AuthenticationManager.login(username, password):
+                    st.rerun()
                 else:
-                    st.warning("Please enter your username and password.")
+                    st.error("❌ Incorrect username or password.")
+            else:
+                st.warning("Please enter both your username and password.")
 
-            st.markdown("""
-            <p style="color:#94a3b8; font-size:12px; text-align:center;
-                       margin:20px 0 0 0; border-top:1px solid #f1f5f9; padding-top:16px;">
-                <strong>Demo:</strong> username <code>superadmin</code>
-                · password <code>admin123</code>
-            </p>
-            """, unsafe_allow_html=True)
-
-            st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)

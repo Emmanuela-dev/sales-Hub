@@ -33,6 +33,16 @@ WHERE is_active = TRUE
 ORDER BY full_name ASC
 """
 
+QUERY_CREATE_USER = """
+INSERT INTO users
+(username, full_name, email, phone, password_hash, role)
+VALUES (%s,%s,%s,%s,%s,%s)
+"""
+
+QUERY_UPDATE_USER_STATUS = """
+UPDATE users SET is_active = %s WHERE user_id = %s
+"""
+
 # ============================================================
 # DASHBOARD — OWNER REMOTE MONITORING
 # ============================================================
