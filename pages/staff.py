@@ -38,10 +38,11 @@ def _css():
 
 
 ROLE_STYLE = {
-    "Owner":   ("#ec4899", "#fdf2f8"),
-    "Manager": ("#8b5cf6", "#f5f3ff"),
-    "Staff":   ("#3b82f6", "#eff6ff"),
+    "Owner":   ("#ffb6b9", "#fff5f5"),
+    "Manager": ("#a7dadc", "#f4f9f9"),
+    "Staff":   ("#457b9d", "#f0f7f9"),
 }
+
 
 
 # ── Staff list ────────────────────────────────────────────────────────────────
@@ -358,9 +359,9 @@ def main():
     # Role capability summary
     if role == "Owner":
         st.markdown("""
-        <div style="background:#fdf2f8;border-left:4px solid #ec4899;
+        <div style="background:#fff5f5;border-left:4px solid #ffb6b9;
                     border-radius:8px;padding:12px 16px;margin-bottom:20px">
-            <strong style="color:#9d174d">👑 Owner Access</strong>
+            <strong style="color:#d9777f">👑 Owner Access</strong>
             <span style="color:#64748b;font-size:13px;margin-left:8px">
                 You can create Manager and Staff accounts, reset any password,
                 and deactivate any account except your own.

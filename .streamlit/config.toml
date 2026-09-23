@@ -1,7 +1,7 @@
 [theme]
-primaryColor = "#3b82f6"
+primaryColor = "#a7dadc"
 backgroundColor = "#ffffff"
-secondaryBackgroundColor = "#f8fafc"
+secondaryBackgroundColor = "#f4f9f9"
 textColor = "#1e293b"
 font = "sans serif"
 
@@ -18,9 +18,6 @@ showErrorDetails = false
 [logger]
 level = "info"
 
-[deprecation]
-showFileUploaderEncoding = false
-showImagecompression = false
-
 [runner]
 magicEnabled = true
+

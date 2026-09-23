@@ -232,10 +232,11 @@ GROUP BY u.user_id, u.full_name, u.role, sa.check_in, sa.check_out
 ORDER BY sa.check_in ASC
 """
 
-# Recent transactions (last 10)
+# Recent transactions (accumulating history)
 QUERY_RECENT_SALES = """
 SELECT
     s.sale_id,
+    s.sale_date,
     s.sale_time,
     u.full_name                       AS served_by,
     s.total_amount,
@@ -244,10 +245,20 @@ SELECT
     s.status
 FROM sales s
 LEFT JOIN users u     ON s.served_by   = u.user_id
-WHERE s.sale_date = CURDATE()
-ORDER BY s.sale_time DESC
+ORDER BY s.sale_date DESC, s.sale_time DESC
 LIMIT 15
 """
+
+# All-time accumulated sales total
+QUERY_ALL_TIME_SUMMARY = """
+SELECT
+    COUNT(*)                           AS total_txns,
+    COALESCE(SUM(total_amount), 0)     AS total_revenue,
+    COALESCE(SUM(discount_amount), 0)  AS total_discounts
+FROM sales
+WHERE status = 'Completed'
+"""
+
 
 # Staff: only their own sales today (with amounts — they need to know what they collected)
 QUERY_MY_SALES_TODAY = """
@@ -733,4 +744,45 @@ FROM staff_attendance sa
 JOIN users u ON sa.user_id = u.user_id
 WHERE sa.work_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
 ORDER BY sa.work_date DESC, sa.check_in ASC
+"""
+
+# ============================================================
+# M-PESA STK PUSH TRANSACTIONS
+# ============================================================
+
+QUERY_CREATE_MPESA_TABLE = """
+CREATE TABLE IF NOT EXISTS mpesa_transactions (
+    id                   INT AUTO_INCREMENT PRIMARY KEY,
+    checkout_request_id  VARCHAR(100) NOT NULL UNIQUE,
+    merchant_request_id  VARCHAR(100) NULL,
+    phone_number         VARCHAR(20)  NOT NULL,
+    amount               DECIMAL(12,2) NOT NULL,
+    status               ENUM('PENDING', 'COMPLETED', 'FAILED', 'CANCELLED') DEFAULT 'PENDING',
+    mpesa_receipt_number VARCHAR(50)  NULL,
+    result_desc          TEXT NULL,
+    created_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_mpesa_checkout (checkout_request_id),
+    INDEX idx_mpesa_status   (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+"""
+
+QUERY_ADD_MPESA_TRANSACTION = """
+INSERT INTO mpesa_transactions
+(checkout_request_id, merchant_request_id, phone_number, amount, status, result_desc)
+VALUES (%s, %s, %s, %s, %s, %s)
+"""
+
+QUERY_UPDATE_MPESA_TRANSACTION = """
+UPDATE mpesa_transactions
+SET status = %s,
+    mpesa_receipt_number = COALESCE(%s, mpesa_receipt_number),
+    result_desc = %s
+WHERE checkout_request_id = %s
+"""
+
+QUERY_GET_MPESA_TRANSACTION = """
+SELECT checkout_request_id, merchant_request_id, phone_number, amount, status, mpesa_receipt_number, result_desc, created_at
+FROM mpesa_transactions
+WHERE checkout_request_id = %s
 """

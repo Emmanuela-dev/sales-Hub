@@ -3,21 +3,28 @@ Database Connection Module
 Handles MySQL database connectivity with connection pooling and error handling
 """
 
+import os
 import mysql.connector
 from mysql.connector import Error, pooling
 import streamlit as st
 from typing import Optional, List, Tuple, Dict
 import pandas as pd
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Database Configuration
 DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': "",  # Change to your MySQL/MariaDB password
-    'database': 'glamour_hub',
+    'host': os.getenv('DB_HOST', 'localhost'),
+    'port': int(os.getenv('DB_PORT', 3306)),
+    'user': os.getenv('DB_USER', 'root'),
+    'password': os.getenv('DB_PASSWORD', 'Emmanuela@20'),
+    'database': os.getenv('DB_NAME', 'glamour_hub'),
     'raise_on_warnings': True,
     'autocommit': True
 }
+
 
 class DatabaseConnection:
     """

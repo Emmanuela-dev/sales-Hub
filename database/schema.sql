@@ -163,6 +163,24 @@ CREATE TABLE IF NOT EXISTS staff_attendance (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
+-- TABLE: mpesa_transactions (track STK push requests & statuses)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS mpesa_transactions (
+    id                   INT AUTO_INCREMENT PRIMARY KEY,
+    checkout_request_id  VARCHAR(100) NOT NULL UNIQUE,
+    merchant_request_id  VARCHAR(100) NULL,
+    phone_number         VARCHAR(20)  NOT NULL,
+    amount               DECIMAL(12,2) NOT NULL,
+    status               ENUM('PENDING', 'COMPLETED', 'FAILED', 'CANCELLED') DEFAULT 'PENDING',
+    mpesa_receipt_number VARCHAR(50)  NULL,
+    result_desc          TEXT NULL,
+    created_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_mpesa_checkout (checkout_request_id),
+    INDEX idx_mpesa_status   (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
 -- TRIGGERS
 -- ============================================================
 

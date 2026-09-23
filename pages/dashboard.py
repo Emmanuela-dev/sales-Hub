@@ -98,19 +98,22 @@ def _kpi(label, value, sub="", border="#16a34a", sub_cls="neutral"):
 # ── sections ──────────────────────────────────────────────────────────────────
 
 def _today_kpis():
-    today   = DatabaseConnection.fetch_one(sql_queries.QUERY_TODAY_SUMMARY)
-    profit  = DatabaseConnection.fetch_one(sql_queries.QUERY_TODAY_PROFIT)
-    yest    = DatabaseConnection.fetch_one(sql_queries.QUERY_YESTERDAY_REVENUE)
-    month   = DatabaseConnection.fetch_one(sql_queries.QUERY_THIS_MONTH_SUMMARY)
-    expenses= DatabaseConnection.fetch_one(sql_queries.QUERY_THIS_MONTH_EXPENSES)
+    today    = DatabaseConnection.fetch_one(sql_queries.QUERY_TODAY_SUMMARY)
+    profit   = DatabaseConnection.fetch_one(sql_queries.QUERY_TODAY_PROFIT)
+    yest     = DatabaseConnection.fetch_one(sql_queries.QUERY_YESTERDAY_REVENUE)
+    month    = DatabaseConnection.fetch_one(sql_queries.QUERY_THIS_MONTH_SUMMARY)
+    expenses = DatabaseConnection.fetch_one(sql_queries.QUERY_THIS_MONTH_EXPENSES)
+    all_time = DatabaseConnection.fetch_one(sql_queries.QUERY_ALL_TIME_SUMMARY)
 
-    txns    = int(safe(today[0] if today else 0))
-    revenue = safe(today[1] if today else 0)
-    yest_rev= safe(yest[0]   if yest  else 0)
-    gp      = safe(profit[2] if profit else 0)
-    m_rev   = safe(month[1]  if month  else 0)
-    m_exp   = safe(expenses[0] if expenses else 0)
-    net     = m_rev - m_exp
+    txns     = int(safe(today[0] if today else 0))
+    revenue  = safe(today[1] if today else 0)
+    yest_rev = safe(yest[0]   if yest  else 0)
+    gp       = safe(profit[2] if profit else 0)
+    m_rev    = safe(month[1]  if month  else 0)
+    m_exp    = safe(expenses[0] if expenses else 0)
+    net      = m_rev - m_exp
+    all_rev  = safe(all_time[1] if all_time else 0)
+    all_txns = int(safe(all_time[0] if all_time else 0))
 
     rev_delta = pct_change(revenue, yest_rev)
     rev_sub   = (f"{'▲' if rev_delta>=0 else '▼'} {abs(rev_delta):.1f}% vs yesterday"
@@ -118,12 +121,13 @@ def _today_kpis():
     rev_cls   = "up" if (rev_delta or 0) >= 0 else "down"
 
     c1,c2,c3,c4,c5,c6 = st.columns(6)
-    with c1: _kpi("Today's Sales",     kes(revenue), rev_sub,        "#16a34a", rev_cls)
-    with c2: _kpi("Transactions",      str(txns),    "today",        "#3b82f6", "neutral")
-    with c3: _kpi("Gross Profit Today",kes(gp),      "after product cost","#8b5cf6","up" if gp>0 else "down")
+    with c1: _kpi("Today's Sales",     kes(revenue), rev_sub,        "#a7dadc", rev_cls)
+    with c2: _kpi("Transactions Today",str(txns),    "today",        "#457b9d", "neutral")
+    with c3: _kpi("Gross Profit Today",kes(gp),      "after product cost","#ffb6b9","up" if gp>0 else "down")
     with c4: _kpi("Month Revenue",     kes(m_rev),   f"{month[1] if month else 0:.0f} KES","#0ea5e9","neutral")
     with c5: _kpi("Month Expenses",    kes(m_exp),   "recorded costs","#f59e0b","down" if m_exp>0 else "neutral")
-    with c6: _kpi("Net Profit (month)",kes(net),     "revenue − expenses","#16a34a" if net>=0 else "#dc2626","up" if net>=0 else "down")
+    with c6: _kpi("All-Time Total",    kes(all_rev), f"{all_txns} total sales","#a7dadc","up")
+
 
 
 def _stock_alerts():
@@ -223,15 +227,15 @@ def _revenue_chart():
     fig = go.Figure()
     fig.add_trace(go.Bar(
         x=df["label"], y=df["revenue"],
-        marker_color="#3b82f6",
+        marker_color="#a7dadc",
         hovertemplate="<b>%{x}</b><br>KES %{y:,.0f}<extra></extra>",
         name="Revenue",
     ))
     fig.add_trace(go.Scatter(
         x=df["label"], y=df["txn_count"],
         mode="lines+markers", yaxis="y2",
-        line=dict(color="#f59e0b", width=2),
-        marker=dict(size=7),
+        line=dict(color="#ffb6b9", width=3),
+        marker=dict(size=8, color="#ffb6b9"),
         name="Transactions",
         hovertemplate="%{y} txns<extra></extra>",
     ))
@@ -263,12 +267,12 @@ def _hourly_chart():
     peak_hour = int(df.loc[df["revenue"].idxmax(), "hour_of_day"]) if df["revenue"].sum() > 0 else None
     if peak_hour:
         st.markdown(
-            f'<div class="info-card">🔥 Peak hour today: <strong>{peak_hour:02d}:00</strong></div>',
+            f'<div class="info-card" style="border-left-color:#a7dadc;background:#f4f9f9">🔥 Peak hour today: <strong>{peak_hour:02d}:00</strong></div>',
             unsafe_allow_html=True)
 
     fig = px.bar(
         df, x="label", y="revenue",
-        color="revenue", color_continuous_scale="Blues",
+        color="revenue", color_continuous_scale=["#f4f9f9", "#a7dadc", "#ffb6b9"],
         labels={"label":"Hour","revenue":"KES"},
     )
     fig.update_layout(
@@ -287,12 +291,12 @@ def _payment_methods_today():
         st.info("No payments yet today.")
         return
 
-    colors = {"M-Pesa":"#16a34a","Cash":"#3b82f6","Card":"#f59e0b","Split":"#8b5cf6"}
+    colors = {"M-Pesa":"#a7dadc","Cash":"#ffb6b9","Card":"#457b9d","Split":"#e63946"}
     fig = go.Figure(go.Pie(
         labels=df["payment_method"], values=df["total_amount"],
         hole=0.55,
         marker=dict(
-            colors=[colors.get(m,"#94a3b8") for m in df["payment_method"]],
+            colors=[colors.get(m,"#a7dadc") for m in df["payment_method"]],
             line=dict(color="white",width=2)),
         textinfo="label+percent",
         hovertemplate="<b>%{label}</b><br>KES %{value:,.0f}<extra></extra>",
@@ -312,7 +316,7 @@ def _recent_transactions():
     st.markdown('<p class="section">🧾 Recent Transactions</p>', unsafe_allow_html=True)
     df = DatabaseConnection.fetch_dataframe(sql_queries.QUERY_RECENT_SALES)
     if df is None or df.empty:
-        st.info("No transactions today yet.")
+        st.info("No recorded transactions found.")
         return
 
     for _, row in df.iterrows():
@@ -320,6 +324,13 @@ def _recent_transactions():
         icons  = {"M-Pesa":"📱","Cash":"💵","Card":"💳","Split":"🔀"}
         icon   = icons.get(method,"💰")
         ref    = f" · Ref: {row['mpesa_ref']}" if row.get("mpesa_ref") else ""
+        date_str = ""
+        if row.get("sale_date") is not None:
+            try:
+                date_str = pd.to_datetime(row["sale_date"]).strftime("%d %b ")
+            except Exception:
+                date_str = str(row["sale_date"]) + " "
+
         st.markdown(f"""
         <div style="background:white;border-radius:8px;padding:10px 14px;
                     border:1px solid #e2e8f0;margin-bottom:5px;
@@ -327,7 +338,7 @@ def _recent_transactions():
             <div>
                 <strong style="color:#1e293b">Transaction #{row.get('sale_id','—')}</strong>
                 <span style="color:#64748b;font-size:11px">
-                 · {fmt_time(row.get('sale_time'))}
+                 · {date_str}{fmt_time(row.get('sale_time'))}
                  · {row.get('served_by','')}
                 </span>
             </div>
@@ -340,6 +351,7 @@ def _recent_transactions():
                 </span>
             </div>
         </div>""", unsafe_allow_html=True)
+
 
 
 def _monthly_trend():

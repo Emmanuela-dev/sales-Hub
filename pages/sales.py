@@ -11,6 +11,7 @@ from datetime import datetime, date
 from db_connection import DatabaseConnection
 from auth import AuthenticationManager
 import sql_queries
+from mpesa_service import MpesaService
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -85,6 +86,9 @@ def _add_to_cart(product_id, name, brand, price, qty):
 
 def _clear_cart():
     st.session_state.cart = []
+    for k in ["stk_checkout_id", "stk_phone", "stk_status", "stk_msg", "pos_mpesa_ref"]:
+        if k in st.session_state:
+            del st.session_state[k]
 
 def _cart_subtotal():
     return sum(i["price"] * i["qty"] for i in st.session_state.cart)
@@ -108,7 +112,7 @@ def _today_kpis(user: dict):
         c1, c2 = st.columns(2)
         with c1:
             st.markdown(f"""
-            <div class="kpi-mini" style="border-left-color:#3b82f6">
+            <div class="kpi-mini" style="border-left-color:#a7dadc">
                 <p style="color:#64748b;font-size:11px;text-transform:uppercase;
                           letter-spacing:.5px;margin:0">My Sales Today</p>
                 <p style="color:#1e293b;font-size:20px;font-weight:700;
@@ -116,7 +120,7 @@ def _today_kpis(user: dict):
             </div>""", unsafe_allow_html=True)
         with c2:
             st.markdown(f"""
-            <div class="kpi-mini" style="border-left-color:#ec4899">
+            <div class="kpi-mini" style="border-left-color:#ffb6b9">
                 <p style="color:#64748b;font-size:11px;text-transform:uppercase;
                           letter-spacing:.5px;margin:0">Items Sold Today</p>
                 <p style="color:#1e293b;font-size:20px;font-weight:700;
@@ -133,7 +137,7 @@ def _today_kpis(user: dict):
     c1, c2, c3 = st.columns(3)
     with c1:
         st.markdown(f"""
-        <div class="kpi-mini" style="border-left-color:#3b82f6">
+        <div class="kpi-mini" style="border-left-color:#a7dadc">
             <p style="color:#64748b;font-size:11px;text-transform:uppercase;
                       letter-spacing:.5px;margin:0">Transactions Today</p>
             <p style="color:#1e293b;font-size:20px;font-weight:700;
@@ -141,7 +145,7 @@ def _today_kpis(user: dict):
         </div>""", unsafe_allow_html=True)
     with c2:
         st.markdown(f"""
-        <div class="kpi-mini" style="border-left-color:#16a34a">
+        <div class="kpi-mini" style="border-left-color:#457b9d">
             <p style="color:#64748b;font-size:11px;text-transform:uppercase;
                       letter-spacing:.5px;margin:0">Revenue Today</p>
             <p style="color:#1e293b;font-size:20px;font-weight:700;
@@ -149,7 +153,7 @@ def _today_kpis(user: dict):
         </div>""", unsafe_allow_html=True)
     with c3:
         st.markdown(f"""
-        <div class="kpi-mini" style="border-left-color:#f59e0b">
+        <div class="kpi-mini" style="border-left-color:#ffb6b9">
             <p style="color:#64748b;font-size:11px;text-transform:uppercase;
                       letter-spacing:.5px;margin:0">Discounts Given</p>
             <p style="color:#1e293b;font-size:20px;font-weight:700;
@@ -296,14 +300,106 @@ def _pos(user: dict):
             # Payment
             st.markdown("**Payment**")
             method = st.selectbox(
-                "Method", ["Cash","M-Pesa","Card","Split"], key="pos_method")
+                "Method", ["M-Pesa","Cash","Card","Split"], key="pos_method")
 
             mpesa_ref = ""
-            if method in ("M-Pesa","Split"):
-                mpesa_ref = st.text_input(
-                    "M-Pesa Confirmation Code",
-                    placeholder="e.g. QHX3K4ABCD",
-                    key="pos_mpesa_ref")
+            if method in ("M-Pesa", "Split"):
+                st.markdown("##### 📲 M-Pesa Direct STK Connection")
+                mpesa_mode = st.radio(
+                    "Mode",
+                    ["📱 STK Push Prompt", "✏️ Manual Code Entry"],
+                    horizontal=True,
+                    key="pos_mpesa_mode_radio"
+                )
+
+                if mpesa_mode == "📱 STK Push Prompt":
+                    phone_input = st.text_input(
+                        "Customer M-Pesa Phone Number",
+                        placeholder="e.g. 0712345678 or 0112345678",
+                        key="pos_stk_phone_input"
+                    )
+
+                    stk_c1, stk_c2 = st.columns([1, 1])
+                    with stk_c1:
+                        if st.button("🚀 Send STK Push Prompt", key="btn_trigger_stk", use_container_width=True, type="primary"):
+                            if not phone_input:
+                                st.error("Please enter customer phone number.")
+                            else:
+                                with st.spinner("Initiating M-Pesa STK Push..."):
+                                    DatabaseConnection.execute_query(sql_queries.QUERY_CREATE_MPESA_TABLE)
+                                    res = MpesaService.initiate_stk_push(
+                                        phone_number=phone_input,
+                                        amount=total,
+                                        account_reference="GlamourHub",
+                                        transaction_desc="Sales Hub"
+                                    )
+                                if res.get("success"):
+                                    chk_id = res["checkout_request_id"]
+                                    st.session_state["stk_checkout_id"] = chk_id
+                                    st.session_state["stk_phone"] = res["phone_number"]
+                                    st.session_state["stk_status"] = "PENDING"
+                                    st.session_state["stk_msg"] = res["customer_message"]
+
+                                    DatabaseConnection.execute_query(
+                                        sql_queries.QUERY_ADD_MPESA_TRANSACTION,
+                                        (chk_id, res.get("merchant_request_id"), res["phone_number"], total, "PENDING", res["customer_message"])
+                                    )
+                                    st.success(f"📲 STK prompt sent to {res['phone_number']}! Customer enter PIN.")
+                                    st.rerun()
+                                else:
+                                    st.error(f"❌ {res.get('message')}")
+
+                    if st.session_state.get("stk_checkout_id"):
+                        chk_id = st.session_state["stk_checkout_id"]
+                        status = st.session_state.get("stk_status", "PENDING")
+                        phone = st.session_state.get("stk_phone", "")
+
+                        st.markdown(f"""
+                        <div style="background:#eff6ff;border-left:4px solid #a7dadc;border-radius:8px;padding:10px 12px;margin:8px 0;font-size:12px">
+                            <strong style="color:#1e40af">STK Prompt Sent</strong> to <code>{phone}</code><br>
+                            <span style="color:#64748b">ID: {chk_id[:16]}...</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                        with stk_c2:
+                            if st.button("🔄 Verify M-Pesa Status", key="btn_check_stk", use_container_width=True):
+                                with st.spinner("Verifying with Safaricom M-Pesa..."):
+                                    q_res = MpesaService.query_stk_status(chk_id)
+                                    st.session_state["stk_status"] = q_res["status"]
+                                    st.session_state["stk_msg"] = q_res["message"]
+
+                                    receipt = q_res.get("receipt_number")
+                                    if receipt:
+                                        st.session_state["pos_mpesa_ref"] = receipt
+                                    elif q_res["status"] == "COMPLETED" and not st.session_state.get("pos_mpesa_ref"):
+                                        st.session_state["pos_mpesa_ref"] = f"MP_{chk_id[:8].upper()}"
+
+                                    DatabaseConnection.execute_query(
+                                        sql_queries.QUERY_UPDATE_MPESA_TRANSACTION,
+                                        (q_res["status"], receipt or st.session_state.get("pos_mpesa_ref"), q_res.get("result_desc"), chk_id)
+                                    )
+                                    st.rerun()
+
+                        if status == "COMPLETED":
+                            ref_val = st.session_state.get("pos_mpesa_ref", "")
+                            st.success(f"✅ M-Pesa Payment Confirmed! Code: **{ref_val}**")
+                            mpesa_ref = ref_val
+                        elif status == "CANCELLED":
+                            st.error(f"❌ {st.session_state.get('stk_msg', 'Transaction cancelled.')}")
+                        elif status == "FAILED":
+                            st.error(f"⚠️ {st.session_state.get('stk_msg', 'Transaction failed.')}")
+                        else:
+                            st.info("⏳ Waiting for customer PIN... Click 'Verify M-Pesa Status' after PIN input.")
+
+                else:
+                    mpesa_ref = st.text_input(
+                        "M-Pesa Confirmation Code",
+                        value=st.session_state.get("pos_mpesa_ref", ""),
+                        placeholder="e.g. QHX3K4ABCD",
+                        key="pos_mpesa_ref_input")
+
+                if not mpesa_ref and st.session_state.get("pos_mpesa_ref"):
+                    mpesa_ref = st.session_state["pos_mpesa_ref"]
 
             amount_paid = st.number_input(
                 "Amount Tendered (KES)",
@@ -331,9 +427,36 @@ def _pos(user: dict):
 
             if checkout:
                 if method == "M-Pesa" and not mpesa_ref:
-                    st.error("M-Pesa confirmation code is required.")
+                    # If phone entered, trigger STK push automatically
+                    phone_val = st.session_state.get("pos_stk_phone_input", "").strip()
+                    if phone_val and not st.session_state.get("stk_checkout_id"):
+                        with st.spinner("Connecting to M-Pesa & sending STK Push prompt..."):
+                            DatabaseConnection.execute_query(sql_queries.QUERY_CREATE_MPESA_TABLE)
+                            res = MpesaService.initiate_stk_push(
+                                phone_number=phone_val,
+                                amount=total,
+                                account_reference="GlamourHub",
+                                transaction_desc="Sales Hub"
+                            )
+                        if res.get("success"):
+                            chk_id = res["checkout_request_id"]
+                            st.session_state["stk_checkout_id"] = chk_id
+                            st.session_state["stk_phone"] = res["phone_number"]
+                            st.session_state["stk_status"] = "PENDING"
+                            st.session_state["stk_msg"] = res["customer_message"]
+                            DatabaseConnection.execute_query(
+                                sql_queries.QUERY_ADD_MPESA_TRANSACTION,
+                                (chk_id, res.get("merchant_request_id"), res["phone_number"], total, "PENDING", res["customer_message"])
+                            )
+                            st.success(f"📲 STK push prompt sent to {res['phone_number']}! Ask customer to enter PIN, then click Complete Sale again.")
+                            st.rerun()
+                        else:
+                            st.error(f"❌ M-Pesa Error: {res.get('message')}")
+                    else:
+                        st.error("Please enter customer phone number and verify M-Pesa payment or confirmation code.")
                 elif not cart:
                     st.error("Cart is empty.")
+
                 else:
                     now = datetime.now()
                     ok = DatabaseConnection.execute_query(
@@ -377,6 +500,7 @@ def _pos(user: dict):
                         st.rerun()
                     else:
                         st.error("Failed to save sale.")
+
 
     # ── Receipt ──
     if "last_receipt" in st.session_state:

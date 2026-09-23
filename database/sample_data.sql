@@ -6,18 +6,6 @@
 USE glamour_hub;
 
 -- ============================================================
--- USERS
--- Demo password for all seeded users: admin123
--- ============================================================
-INSERT INTO users (username, full_name, email, phone, password_hash, role) VALUES
-('owner',   'Amina Wanjiku',  'amina@glamourhub.co.ke',  '0722 001 001', '$2b$12$SZhaR7ik0iiy.zlK6.aA3.oBUFT5hQhf5p1JuLS9IbaEPA8KyTG4e', 'Owner'),
-('manager', 'Grace Njeri',    'grace@glamourhub.co.ke',  '0711 001 002', '$2b$12$SZhaR7ik0iiy.zlK6.aA3.oBUFT5hQhf5p1JuLS9IbaEPA8KyTG4e', 'Manager'),
-('staff1',  'Beatrice Auma',  'bea@glamourhub.co.ke',    '0700 001 003', '$2b$12$SZhaR7ik0iiy.zlK6.aA3.oBUFT5hQhf5p1JuLS9IbaEPA8KyTG4e', 'Staff'),
-('staff2',  'Sharon Chebet',  'sharon@glamourhub.co.ke', '0733 001 004', '$2b$12$SZhaR7ik0iiy.zlK6.aA3.oBUFT5hQhf5p1JuLS9IbaEPA8KyTG4e', 'Staff');
-
--- ============================================================
--- PRODUCT CATEGORIES
--- ============================================================
 INSERT INTO product_categories (name, description) VALUES
 ('Skincare',        'Moisturisers, serums, sunscreen, cleansers'),
 ('Hair Care',       'Shampoos, conditioners, hair oils, treatments'),
