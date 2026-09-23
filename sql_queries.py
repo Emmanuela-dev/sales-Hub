@@ -653,32 +653,45 @@ ORDER BY revenue DESC
 
 QUERY_PROFIT_LOSS = """
 SELECT
-    DATE_FORMAT(s.sale_date,'%Y-%m-01')   AS month,
-    COALESCE(SUM(s.total_amount),0)        AS revenue,
-    COALESCE(SUM(si.qty*p.buying_price),0) AS cogs,
-    COALESCE(SUM(s.total_amount),0)
-        - COALESCE(SUM(si.qty*p.buying_price),0) AS gross_profit,
-    COALESCE((
-        SELECT SUM(e.amount)
-        FROM expenses e
-        WHERE DATE_FORMAT(e.expense_date,'%Y-%m-01')
-              = DATE_FORMAT(s.sale_date,'%Y-%m-01')
-    ),0) AS operating_expenses,
-    COALESCE(SUM(s.total_amount),0)
-        - COALESCE(SUM(si.qty*p.buying_price),0)
-        - COALESCE((
-            SELECT SUM(e.amount) FROM expenses e
-            WHERE DATE_FORMAT(e.expense_date,'%Y-%m-01')
-                  = DATE_FORMAT(s.sale_date,'%Y-%m-01')
-          ),0) AS net_profit
-FROM sales s
-JOIN sale_items si ON s.sale_id     = si.sale_id
-JOIN products p    ON si.product_id = p.product_id
-WHERE s.status = 'Completed'
-  AND s.sale_date >= DATE_SUB(CURDATE(), INTERVAL 5 MONTH)
-GROUP BY month
-ORDER BY month ASC
+    m.month,
+    COALESCE(s_summary.revenue, 0)          AS revenue,
+    COALESCE(s_summary.cogs, 0)             AS cogs,
+    COALESCE(s_summary.gross_profit, 0)     AS gross_profit,
+    COALESCE(e_summary.total_expenses, 0)   AS operating_expenses,
+    (COALESCE(s_summary.gross_profit, 0) - COALESCE(e_summary.total_expenses, 0)) AS net_profit
+FROM (
+    SELECT DISTINCT DATE_FORMAT(sale_date, '%Y-%m-01') AS month
+    FROM sales
+    WHERE sale_date >= DATE_SUB(CURDATE(), INTERVAL 5 MONTH)
+    UNION
+    SELECT DISTINCT DATE_FORMAT(expense_date, '%Y-%m-01') AS month
+    FROM expenses
+    WHERE expense_date >= DATE_SUB(CURDATE(), INTERVAL 5 MONTH)
+) m
+LEFT JOIN (
+    SELECT
+        DATE_FORMAT(s.sale_date, '%Y-%m-01') AS month,
+        COALESCE(SUM(s.total_amount), 0) AS revenue,
+        COALESCE(SUM(si.qty * p.buying_price), 0) AS cogs,
+        COALESCE(SUM(s.total_amount), 0) - COALESCE(SUM(si.qty * p.buying_price), 0) AS gross_profit
+    FROM sales s
+    JOIN sale_items si ON s.sale_id = si.sale_id
+    JOIN products p ON si.product_id = p.product_id
+    WHERE s.status = 'Completed'
+      AND s.sale_date >= DATE_SUB(CURDATE(), INTERVAL 5 MONTH)
+    GROUP BY DATE_FORMAT(s.sale_date, '%Y-%m-01')
+) s_summary ON m.month = s_summary.month
+LEFT JOIN (
+    SELECT
+        DATE_FORMAT(expense_date, '%Y-%m-01') AS month,
+        COALESCE(SUM(amount), 0) AS total_expenses
+    FROM expenses
+    WHERE expense_date >= DATE_SUB(CURDATE(), INTERVAL 5 MONTH)
+    GROUP BY DATE_FORMAT(expense_date, '%Y-%m-01')
+) e_summary ON m.month = e_summary.month
+ORDER BY m.month ASC
 """
+
 
 QUERY_PAYMENT_METHOD_REPORT = """
 SELECT

@@ -21,9 +21,10 @@ DB_CONFIG = {
     'user': os.getenv('DB_USER', 'root'),
     'password': os.getenv('DB_PASSWORD', 'Emmanuela@20'),
     'database': os.getenv('DB_NAME', 'glamour_hub'),
-    'raise_on_warnings': True,
+    'raise_on_warnings': False,
     'autocommit': True
 }
+
 
 
 class DatabaseConnection:
