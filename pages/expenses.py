@@ -384,6 +384,9 @@ def main():
     user = AuthenticationManager.get_current_user()
     if not user:
         st.error("Session expired."); st.stop()
+    if user.get("role") not in ("Owner", "Manager"):
+        st.error("Only the Owner or Manager can access expenses.")
+        st.stop()
 
     st.markdown("""
     <div style="padding:16px 0 20px 0;border-bottom:1px solid #e2e8f0;

@@ -64,8 +64,8 @@ html, body, [class*="css"] {
 NAV_ITEMS = [
     ("Dashboard",  "📊", "dashboard",  None),
     ("Sales / POS","🛍", "sales",      None),
-    ("Inventory",  "📦", "inventory",  None),
-    ("Expenses",   "💼", "expenses",   None),
+    ("Inventory",  "📦", "inventory",  ["Owner", "Manager"]),
+    ("Expenses",   "💼", "expenses",   ["Owner", "Manager"]),
     ("Reports",    "📈", "reports",    ["Owner","Manager"]),
     ("Staff Accounts", "👤", "staff",   ["Owner","Manager"]),
 ]
