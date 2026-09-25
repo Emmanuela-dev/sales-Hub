@@ -20,7 +20,7 @@ load_dotenv()
 class MpesaService:
     """
     Safaricom M-Pesa Daraja API Integration Service.
-    Supports both Live Daraja API and Sandbox Test Simulation modes.
+    Supports Daraja sandbox/production modes. Simulation is opt-in for UI testing.
     """
 
     SANDBOX_CONSUMER_KEY = os.getenv("MPESA_CONSUMER_KEY", "c7QGZ1G5rQ30Z7c4B2WvA9f8G6h5j4k3")
@@ -150,7 +150,22 @@ class MpesaService:
 
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
 
-        # Try live Daraja API call first
+        # Simulation must be explicit. A failed Daraja request must never look like
+        # a real payment prompt, otherwise the cashier can complete an unpaid sale.
+        if os.getenv("MPESA_SIMULATE", "false").lower() == "true":
+            sim_checkout_id = f"ws_CO_SIM_{timestamp}_{random.randint(100, 999)}"
+            sim_merchant_id = f"29115-{timestamp[:8]}-1"
+            return {
+                "success": True,
+                "checkout_request_id": sim_checkout_id,
+                "merchant_request_id": sim_merchant_id,
+                "customer_message": f"[Simulation] STK prompt sent to {formatted_phone}.",
+                "phone_number": formatted_phone,
+                "amount": amt_int,
+                "is_simulated": True
+            }
+
+        # Call the Daraja API and return its error instead of masking it.
         try:
             token = cls.get_access_token()
             config = cls.get_config()
@@ -179,7 +194,10 @@ class MpesaService:
             }
 
             response = requests.post(url, json=payload, headers=headers, timeout=15)
-            res_data = response.json()
+            try:
+                res_data = response.json()
+            except ValueError:
+                res_data = {}
 
             if res_data.get("ResponseCode") == "0":
                 return {
@@ -191,23 +209,24 @@ class MpesaService:
                     "amount": amt_int
                 }
 
-        except Exception as api_err:
-            # Fall back seamlessly to Sandbox Test Simulation Mode
-            pass
+            error_message = (
+                res_data.get("errorMessage")
+                or res_data.get("ResponseDescription")
+                or res_data.get("error_description")
+                or response.text
+                or f"HTTP {response.status_code}"
+            )
+            return {
+                "success": False,
+                "message": f"Daraja rejected the STK request: {error_message}",
+                "api_response": res_data,
+            }
 
-        # Sandbox Test Simulation Mode
-        sim_checkout_id = f"ws_CO_SIM_{timestamp}_{random.randint(100, 999)}"
-        sim_merchant_id = f"29115-{timestamp[:8]}-1"
-        
-        return {
-            "success": True,
-            "checkout_request_id": sim_checkout_id,
-            "merchant_request_id": sim_merchant_id,
-            "customer_message": f"📲 [Sandbox Test Mode] STK push prompt sent to {formatted_phone}! Enter M-Pesa PIN.",
-            "phone_number": formatted_phone,
-            "amount": amt_int,
-            "is_simulated": True
-        }
+        except Exception as api_err:
+            return {
+                "success": False,
+                "message": f"Could not reach Daraja: {api_err}",
+            }
 
     @classmethod
     def query_stk_status(cls, checkout_request_id: str) -> dict:
@@ -309,12 +328,8 @@ class MpesaService:
                 }
 
         except Exception as e:
-            # Fallback for simulated or offline test query
-            random_letters = ''.join(random.choices(string.ascii_uppercase + string.digits, k=7))
-            sim_receipt = f"Q{random_letters}"
             return {
-                "status": "COMPLETED",
-                "receipt_number": sim_receipt,
-                "result_desc": "The service request has been accepted successfully.",
-                "message": f"✅ Payment Confirmed! Code: {sim_receipt}"
+                "status": "FAILED",
+                "result_desc": str(e),
+                "message": f"Could not verify payment with Daraja: {e}"
             }
