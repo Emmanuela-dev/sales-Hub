@@ -83,6 +83,14 @@ class MpesaService:
 
         return None
 
+    @staticmethod
+    def format_test_phone_number(phone: str) -> str:
+        """Normalize a test phone value without applying Kenyan-number rules."""
+        if not phone:
+            return None
+        cleaned = re.sub(r"[^0-9]", "", str(phone))
+        return cleaned if 7 <= len(cleaned) <= 15 else None
+
     @classmethod
     def ensure_table_exists(cls):
         """Ensures mpesa_transactions table exists in MySQL without throwing warning exceptions."""
@@ -134,11 +142,20 @@ class MpesaService:
         """
         cls.ensure_table_exists()
 
-        formatted_phone = cls.format_phone_number(phone_number)
+        simulation_enabled = os.getenv("MPESA_SIMULATE", "false").lower() == "true"
+        formatted_phone = (
+            cls.format_test_phone_number(phone_number)
+            if simulation_enabled
+            else cls.format_phone_number(phone_number)
+        )
         if not formatted_phone:
             return {
                 "success": False,
-                "message": "Invalid Kenyan phone number format. Please enter e.g. 0712345678 or 0112345678."
+                "message": (
+                    "Enter a phone number with 7 to 15 digits."
+                    if simulation_enabled
+                    else "Invalid Kenyan phone number format. Please enter e.g. 0712345678 or 0112345678."
+                )
             }
 
         amt_int = int(round(amount))
@@ -152,7 +169,7 @@ class MpesaService:
 
         # Simulation must be explicit. A failed Daraja request must never look like
         # a real payment prompt, otherwise the cashier can complete an unpaid sale.
-        if os.getenv("MPESA_SIMULATE", "false").lower() == "true":
+        if simulation_enabled:
             sim_checkout_id = f"ws_CO_SIM_{timestamp}_{random.randint(100, 999)}"
             sim_merchant_id = f"29115-{timestamp[:8]}-1"
             return {

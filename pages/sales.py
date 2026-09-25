@@ -4,6 +4,7 @@ Record sales, build a cart, apply discounts, handle M-Pesa/Cash/Card.
 Also shows full sales history with receipt view.
 """
 
+import os
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -315,6 +316,7 @@ def _pos(user: dict):
                 if mpesa_mode == "📱 STK Push Prompt":
                     phone_input = st.text_input(
                         "Customer M-Pesa Phone Number",
+                        value=os.getenv("MPESA_TEST_PHONE", ""),
                         placeholder="e.g. 0712345678 or 0112345678",
                         key="pos_stk_phone_input"
                     )
